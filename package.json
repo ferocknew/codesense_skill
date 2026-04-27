@@ -1,0 +1,27 @@
+{
+  "name": "codesense",
+  "version": "0.1.0",
+  "description": "本地语义代码搜索 - 通过向量索引定位代码片段，支持 AST 依赖追踪",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node run.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  },
+  "dependencies": {
+    "tree-sitter": "^0.21.0",
+    "tree-sitter-python": "^0.23.0",
+    "tree-sitter-javascript": "^0.23.0",
+    "tree-sitter-typescript": "^0.23.0",
+    "tree-sitter-go": "^0.23.0",
+    "tree-sitter-rust": "^0.23.0",
+    "tree-sitter-java": "^0.23.0",
+    "tree-sitter-c": "^0.23.0",
+    "tree-sitter-cpp": "^0.23.0",
+    "@lancedb/lancedb": "^0.18.0",
+    "commander": "^12.0.0"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+codesense-out/
+dist/
+skill.js
+*.js.map
+.DS_Store
