@@ -4,37 +4,46 @@ import * as path from "path";
 export const CLAUDE_MD_MARKER = "<!-- codesense-start -->";
 export const CLAUDE_MD_END_MARKER = "<!-- codesense-end -->";
 
-const CLAUDE_MD_INJECTION = `
+function getSkillCommand(): string {
+  return `node "${path.resolve(__dirname, "skill.js")}"`;
+}
+
+function getClaudeMdInjection(): string {
+  const cmd = getSkillCommand();
+  return `
 ${CLAUDE_MD_MARKER}
 ## codesense
 
 本项目有 codesense 语义代码索引（\`codesense-out/\`）。
 
 Rules:
-- 回答"这段代码在哪"、"怎么实现 X"类问题时，先运行 \`codesense search "<问题描述>"\`
-- 需要理解调用链、影响范围时，运行 \`codesense trace "<符号名>"\`
-- 修改代码后，运行 \`codesense update\` 增量更新（如已安装 hook 则自动触发）
+- 回答"这段代码在哪"、"怎么实现 X"类问题时，先运行 \`${cmd} search "<问题描述>"\`
+- 需要理解调用链、影响范围时，运行 \`${cmd} trace "<符号名>"\`
+- 修改代码后，运行 \`${cmd} update\` 增量更新（如已安装 hook 则自动触发）
 - 搜索返回的是 chunk 级结果，仍需读取源文件确认完整上下文
 ${CLAUDE_MD_END_MARKER}
 `;
+}
 
 export const HOOK_MARKER = "# codesense auto-update";
-const HOOK_CONTENT = `${HOOK_MARKER}
-codesense update --quiet 2>/dev/null || true`;
 
 export async function install(): Promise<void> {
+  const skillCmd = getSkillCommand();
+  const hookContent = `${HOOK_MARKER}\n${skillCmd} update --quiet 2>/dev/null || true`;
+
   // Step 1: 注入 CLAUDE.md
   const claudeMdPath = path.resolve("CLAUDE.md");
+  const injection = getClaudeMdInjection();
   if (fs.existsSync(claudeMdPath)) {
     const content = fs.readFileSync(claudeMdPath, "utf-8");
     if (content.includes(CLAUDE_MD_MARKER)) {
       console.log("CLAUDE.md 已包含 codesense 段落，跳过。");
     } else {
-      fs.writeFileSync(claudeMdPath, content + CLAUDE_MD_INJECTION, "utf-8");
+      fs.writeFileSync(claudeMdPath, content + injection, "utf-8");
       console.log("✓ 已向 CLAUDE.md 注入 codesense 使用说明");
     }
   } else {
-    fs.writeFileSync(claudeMdPath, CLAUDE_MD_INJECTION.trimStart(), "utf-8");
+    fs.writeFileSync(claudeMdPath, injection.trimStart(), "utf-8");
     console.log("✓ 已创建 CLAUDE.md 并注入 codesense 使用说明");
   }
 
@@ -56,11 +65,11 @@ export async function install(): Promise<void> {
     if (content.includes(HOOK_MARKER)) {
       console.log("post-commit hook 已包含 codesense，跳过。");
     } else {
-      fs.writeFileSync(hookPath, content + "\n" + HOOK_CONTENT + "\n", "utf-8");
+      fs.writeFileSync(hookPath, content + "\n" + hookContent + "\n", "utf-8");
       console.log("✓ 已向 post-commit hook 追加 codesense 更新");
     }
   } else {
-    fs.writeFileSync(hookPath, `#!/bin/sh\n${HOOK_CONTENT}\n`, "utf-8");
+    fs.writeFileSync(hookPath, `#!/bin/sh\n${hookContent}\n`, "utf-8");
     fs.chmodSync(hookPath, 0o755);
     console.log("✓ 已创建 post-commit hook（codesense 自动更新）");
   }
