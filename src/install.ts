@@ -209,7 +209,7 @@ function checkGitHook(absDir: string): void {
   const hookDir = path.join(gitDir, "hooks");
   const hookPath = path.join(hookDir, "post-commit");
   const skillCmd = getSkillCommand();
-  const hookContent = `${HOOK_MARKER}\nCHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD)\nif [ -n "$CHANGED" ]; then\n  echo "$CHANGED" | xargs ${skillCmd} update --quiet --files 2>/dev/null || true\nfi`;
+  const hookContent = `${HOOK_MARKER}\n${skillCmd} update --quiet 2>/dev/null || true`;
 
   if (!fs.existsSync(hookDir)) {
     fs.mkdirSync(hookDir, { recursive: true });
