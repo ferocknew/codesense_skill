@@ -158,6 +158,24 @@ function onReady(){
   loadLogDates();
   // SSE
   var es=new EventSource("/api/events");
+  es.addEventListener("project-added",function(e){
+    var d=JSON.parse(e.data);
+    if(d.name&&!document.querySelector('[data-name="'+d.name+'"]')){
+      var div=document.createElement("div");
+      div.className="proj-item";
+      div.dataset.name=d.name;
+      div.innerHTML='<div class="proj-name"><span class="status status-idle"></span> '+esc(d.name)+'</div>'
+        +'<div class="proj-path" title="'+esc(d.path)+'">'+esc(d.path)+'</div>'
+        +'<div class="proj-stats"><span>-</span></div>'
+        +'<div class="proj-actions">'
+        +'<button class="btn" onclick="event.stopPropagation();triggerAction(\''+esc(d.name)+'\',\'update\')">增量更新</button> '
+        +'<button class="btn" onclick="event.stopPropagation();triggerAction(\''+esc(d.name)+'\',\'index\')">重建索引</button> '
+        +'<button class="btn" onclick="event.stopPropagation();showLogs()">查看日志</button>'
+        +'</div>';
+      div.addEventListener("click",function(){selectProject(d.name)});
+      document.getElementById("projList").appendChild(div);
+    }
+  });
   es.onmessage=function(e){
     var d=JSON.parse(e.data);
     if(d.type==="state"&&d.project){

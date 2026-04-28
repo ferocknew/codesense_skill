@@ -70,6 +70,9 @@ export async function startServer(options: ServerOptions): Promise<void> {
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 
+  // 定期检查新注册项目（每 30s）
+  setInterval(() => refreshProjects(state), 30_000);
+
   server.listen(options.port, () => {
     console.log(`codesense server 已启动`);
     console.log(`  地址:     http://localhost:${options.port}`);
@@ -84,6 +87,16 @@ export async function startServer(options: ServerOptions): Promise<void> {
     }
     console.error("服务器错误:", err.message);
   });
+}
+
+function refreshProjects(state: ServerState): void {
+  const projects = listProjects();
+  for (const p of projects) {
+    if (!state.projects[p.name]) {
+      initProjectState(state, p.name, p.path);
+      broadcastSSE("project-added", { name: p.name, path: p.path, status: "idle" });
+    }
+  }
 }
 
 async function handleRequest(

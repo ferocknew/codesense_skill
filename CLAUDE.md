@@ -131,35 +131,35 @@ scripts/
 
 ## 变更记录
 
-### 2026-04-28 仪表板与图谱修复
+### 2026-04-28 Bug 修复：跨文件追踪 + 搜索重复 + 幂等性
 
-**Dashboard HTML** (`src/html/index.ts`)：
-1. **布局重构** — 搜索框从左侧 sidebar 移至右侧 toolbar，sidebar 只保留项目列表 + 符号详情
-2. **语义搜索修复** — 后端返回字段 `file`，前端曾误用 `filePath`；已统一字段名
-3. **符号详情修复** — `buildFileGraph()` 缺少 `fullPath`/`funcCount`/`functions` 字段，点击节点显示 undefined
+**跨文件依赖追踪** (`src/graph.ts`)：
+- 新增 `buildTSImportMap()` — 解析 `import { foo } from './module'` 构建 localName→目标 nodeId 映射
+- `extractCallsFromBody()` 增加跨文件解析：本地 symbols 查不到时用 importMap 兜底
+- 依赖边 218→351（+133 跨文件边），`trace buildIndex` 从"无依赖"变为 62 个 callee
 
-**知识图谱** (`src/graph.ts`)：
-1. **路径格式统一** — import 边的 `from`/`to` 节点 ID 混用绝对路径和相对路径，统一为相对路径（`nodeId(relPath, "__module__")`）
-2. **删除 `resolveImportPath`** — 改用 `path.relative(process.cwd(), resolved)` 生成相对路径
-3. 修复后数据：242 节点、289 边（66 import + 223 call），文件间关系正确显示
+**搜索结果去重** (`src/search.ts`)：
+- LanceDB update 累积重复记录（863→287），搜索返回同一 chunk 的多份拷贝
+- 修复：按 `(file, lineStart, symbol)` 去重，保留 score 最高的
 
-**日志系统** (`src/logger.ts`)：
-- 新增文件日志，存储于 `~/.codesense/logs/YYYY-MM-DD.log`，JSON 格式，支持按项目/日期查询
-- API 端点：`/api/logs`、`/api/logs/dates`，Dashboard "查看日志"按钮触发
+**SearchResult 添加 language 字段** (`src/search.ts` + `src/types.ts`)：
+- 结果映射补充 `language` 字段，`-l` 过滤后可验证结果语言
+
+**update 幂等性** (`src/update.ts`)：
+- `git diff-tree HEAD` 总返回最后 commit 的文件，重复 update 重复处理
+- 修复：记录 `lastCommitHash` 到 `~/.codesense/projects/<name>/.last-commit`，相同则跳过
+- update 操作添加 `appendLog`，git hook 触发的 update 现在可查询日志
 
 **注意**：
-- `buildFileGraph()` 返回的 Cytoscape 节点必须包含 `fullPath`、`funcCount`、`functions` 字段
+- `buildTSImportMap` 只处理命名导入（`import { foo }`），不处理 `import * as` 和 `require()`
+- 跨文件解析默认 `.ts` 扩展名，`.tsx`/`.js` 可能产生不匹配的 nodeId
 - 修改 `src/html/index.ts` 后需 `node build.js` + 重启服务器才能生效
-- 搜索结果面板用 `position:absolute` 定位在 toolbar 下方，`main` 需要 `position:relative`
 
-### 2026-04-28 全局化改造
+### 2026-04-28 前期改造（摘要）
 
-**核心变更**：
-1. **新增 `src/global.ts`** — 全局目录管理（`~/.codesense/`、registry.json、项目注册/注销）
-2. **`install` → `init`** — 环境检查（Ollama + 模型）→ 创建全局目录 → 注册项目 → CLAUDE.md + git hook
-3. **索引路径迁移** — 从本地 `codesense-out/` 改为 `~/.codesense/projects/<name>/`
-4. **新增 `list` 命令** / **`search --project`** / **`scripts/` 命令拆分**
-5. **`run.js` 改造** — esbuild 即时编译 / **`build.js`** — entryPoints 改为 `src/cli.ts`
-
-**踩坑**：esbuild 不支持动态 require → 静态 import；run.js require .ts 失败 → esbuild 即时编译；build.js entryPoints 指向 run.js 导致 skill.js 卡住 → 指向 src/cli.ts
+- **全局化**：`~/.codesense/` 全局目录、SQLite 元数据、`install→init`、`list`/`search --project`
+- **Dashboard**：布局重构（搜索框移至 toolbar）、知识图谱路径格式统一、符号详情修复
+- **AST 依赖**：tree-sitter 替换正则提取依赖、新增 `src/parser.ts` 共享解析器基础
+- **日志系统**：`src/logger.ts`，JSONL 文件日志，`/api/logs` 端点
+- **搜索黑名单**：默认排除 SKILL.md/README.md/CLAUDE.md
 
