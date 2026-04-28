@@ -36,6 +36,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .proj-actions{margin-top:4px;display:flex;gap:4px;flex-wrap:wrap}
 .proj-actions .btn{font-size:10px;padding:2px 6px}
+.proj-bar-wrap{margin-top:6px;display:none}
+.proj-bar-wrap.visible{display:block}
+.proj-bar-label{font-size:10px;color:#8b949e;margin-bottom:2px;display:flex;justify-content:space-between}
+.proj-bar-track{height:4px;background:#21262d;border-radius:2px;overflow:hidden}
+.proj-bar-fill{height:100%;background:linear-gradient(90deg,#1f6feb,#58a6ff);border-radius:2px;width:0%;transition:width .3s ease}
 .btn{background:#21262d;color:#c9d1d9;border:1px solid #30363d;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px}
 .btn:hover{background:#30363d}
 .btn.active{background:#1f6feb;border-color:#1f6feb;color:#fff}
@@ -168,25 +173,68 @@ function onReady(){
         +'<div class="proj-path" title="'+esc(d.path)+'">'+esc(d.path)+'</div>'
         +'<div class="proj-stats"><span>-</span></div>'
         +'<div class="proj-actions">'
-        +'<button class="btn" onclick="event.stopPropagation();triggerAction(\''+esc(d.name)+'\',\'update\')">增量更新</button> '
-        +'<button class="btn" onclick="event.stopPropagation();triggerAction(\''+esc(d.name)+'\',\'index\')">重建索引</button> '
+        +'<button class="btn" onclick="event.stopPropagation();triggerAction(\\''+esc(d.name)+'\\',\\\'update\\\')">增量更新</button> '
+        +'<button class="btn" onclick="event.stopPropagation();triggerAction(\\''+esc(d.name)+'\\',\\\'index\\\')">重建索引</button> '
         +'<button class="btn" onclick="event.stopPropagation();showLogs()">查看日志</button>'
         +'</div>';
       div.addEventListener("click",function(){selectProject(d.name)});
       document.getElementById("projList").appendChild(div);
     }
   });
-  es.onmessage=function(e){
+  es.addEventListener("index-progress",function(e){
     var d=JSON.parse(e.data);
+    if(d.type==="progress"&&d.project){
+      updateBar(d.project,d.phase,d.current,d.total);
+    }
     if(d.type==="state"&&d.project){
       var el=document.querySelector('[data-name="'+d.project+'"]');
       if(el){
         var dot=el.querySelector(".status");
         if(dot){dot.className="status status-"+d.status}
       }
-      if(d.status==="completed"||d.status==="failed")loadLogs();
+      if(d.status==="completed"||d.status==="failed"){
+        hideBar(d.project);
+        loadLogs();
+      }
+      if(d.status==="indexing")showBar(d.project);
     }
-  };
+  });
+}
+
+var phaseLabels={scanning:"扫描文件",chunking:"代码分块",embedding:"生成向量",writing:"写入索引",deps:"提取依赖"};
+
+function showBar(name){
+  var wrap=document.getElementById("bar-"+name);
+  if(!wrap){
+    var item=document.querySelector('[data-name="'+name+'"]');
+    if(!item)return;
+    wrap=document.createElement("div");
+    wrap.className="proj-bar-wrap";
+    wrap.id="bar-"+name;
+    item.appendChild(wrap);
+  }
+  wrap.classList.add("visible");
+  wrap.innerHTML='<div class="proj-bar-label"><span class="bar-phase">准备中...</span><span class="bar-pct">0%</span></div><div class="proj-bar-track"><div class="proj-bar-fill"></div></div>';
+}
+
+function updateBar(name,phase,current,total){
+  var wrap=document.getElementById("bar-"+name);
+  if(!wrap||!wrap.classList.contains("visible"))showBar(name);
+  wrap=document.getElementById("bar-"+name);
+  if(!wrap)return;
+  var pct=total>0?Math.round(current/total*100):0;
+  var label=phaseLabels[phase]||phase;
+  var lbl=wrap.querySelector(".bar-phase");
+  var pctEl=wrap.querySelector(".bar-pct");
+  var fill=wrap.querySelector(".proj-bar-fill");
+  if(lbl)lbl.textContent=label;
+  if(pctEl)pctEl.textContent=pct+"%";
+  if(fill)fill.style.width=pct+"%";
+}
+
+function hideBar(name){
+  var wrap=document.getElementById("bar-"+name);
+  if(wrap)wrap.classList.remove("visible");
 }
 
 function selectProject(name){
@@ -490,6 +538,7 @@ function projItem(p: {
     <button class="btn" onclick="event.stopPropagation();triggerAction('${p.name}','index')">重建索引</button>
     <button class="btn" onclick="event.stopPropagation();showLogs()">查看日志</button>
   </div>
+  <div class="proj-bar-wrap" id="bar-${p.name}"></div>
 </div>`;
 }
 

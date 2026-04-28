@@ -250,7 +250,19 @@ async function triggerIndex(
   const start = Date.now();
   try {
     const { buildIndex } = require("./indexer");
-    await buildIndex(project.path, { quiet: true, exitOnError: false });
+    await buildIndex(project.path, {
+      quiet: true,
+      exitOnError: false,
+      onProgress: (phase: string, current: number, total: number) => {
+        broadcastSSE("index-progress", {
+          type: "progress",
+          project: name,
+          phase,
+          current,
+          total,
+        });
+      },
+    });
     const durationMs = Date.now() - start;
     updateProjectState(state, name, {
       status: "completed",

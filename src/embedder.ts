@@ -45,23 +45,20 @@ export class OllamaEmbedder {
     }
   }
 
-  async embed(texts: string[]): Promise<number[][]> {
+  async embed(texts: string[], onProgress?: (current: number, total: number) => void): Promise<number[][]> {
     if (texts.length === 0) return [];
 
     const results: number[][] = [];
     const batchSize = 32;
     const totalBatches = Math.ceil(texts.length / batchSize);
-    const barWidth = 20;
 
     for (let i = 0; i < texts.length; i += batchSize) {
       const batch = texts.slice(i, i + batchSize);
       const batchNum = Math.floor(i / batchSize) + 1;
 
       if (totalBatches > 1) {
-        const pct = Math.round((batchNum / totalBatches) * 100);
-        const filled = Math.round(barWidth * batchNum / totalBatches);
-        const bar = "█".repeat(filled) + "░".repeat(barWidth - filled);
-        process.stderr.write(`\r  Embedding [${bar}] ${pct}% (${batchNum}/${totalBatches})`);
+        process.stderr.write(`  Embedding batch ${batchNum}/${totalBatches}...\n`);
+        onProgress?.(batchNum, totalBatches);
       }
 
       const resp = await fetch(`${this.config.baseUrl}/api/embed`, {
@@ -83,10 +80,6 @@ export class OllamaEmbedder {
       // MRL 截断: API 返回 dimensionsFull 维，截断到目标维度
       const truncated = data.embeddings.map((e) => e.slice(0, this.config.dimensions));
       results.push(...truncated);
-    }
-
-    if (totalBatches > 1) {
-      process.stderr.write("\n");
     }
 
     return results;

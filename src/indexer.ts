@@ -10,13 +10,21 @@ import { saveConfig, resolveDimensions, ensureProjectOutputDir } from "./config"
 import { extractDeps, mergeDepGraphs, saveDepGraph } from "./graph";
 import { resolveProjectName, registerProject } from "./global";
 
+export type ProgressPhase = "scanning" | "chunking" | "embedding" | "writing" | "deps";
+
 export async function buildIndex(
   dir: string,
-  options: { strategy?: string; quiet?: boolean; exitOnError?: boolean } = {}
+  options: {
+    strategy?: string;
+    quiet?: boolean;
+    exitOnError?: boolean;
+    onProgress?: (phase: ProgressPhase, current: number, total: number) => void;
+  } = {}
 ): Promise<void> {
   const strategy = options.strategy || "auto";
   const quiet = options.quiet || false;
   const exitOnError = options.exitOnError !== false;
+  const onProgress = options.onProgress;
   const absDir = path.resolve(dir);
   const projectName = resolveProjectName(absDir);
 
@@ -28,6 +36,7 @@ export async function buildIndex(
     throw new Error("未找到支持的代码文件。");
   }
   if (!quiet) console.log(`找到 ${files.length} 个代码文件`);
+  onProgress?.("scanning", files.length, files.length);
 
   // 2. 分块
   const allChunks: CodeChunk[] = [];
@@ -46,6 +55,7 @@ export async function buildIndex(
     throw new Error("分块后无有效代码片段。");
   }
   if (!quiet) console.log(`生成 ${allChunks.length} 个代码块`);
+  onProgress?.("chunking", allChunks.length, allChunks.length);
 
   // 3. 确定维度策略
   const dimensions = resolveDimensions(allChunks.length, strategy);
@@ -59,7 +69,9 @@ export async function buildIndex(
   // 5. 批量 embedding
   if (!quiet) process.stderr.write("生成向量...\n");
   const inputs = allChunks.map((c) => buildEmbeddingInput(c));
-  const vectors = await embedder.embed(inputs);
+  const vectors = await embedder.embed(inputs, (current, total) => {
+    onProgress?.("embedding", current, total);
+  });
 
   // 6. 构建索引记录
   const records = allChunks.map((chunk, i) => ({
@@ -79,10 +91,13 @@ export async function buildIndex(
   const outDir = ensureProjectOutputDir(projectName);
   const dbPath = path.join(outDir, "index.lance");
   if (!quiet) process.stderr.write("写入索引...\n");
+  onProgress?.("writing", 0, records.length);
   await createTable(dbPath, records);
+  onProgress?.("writing", records.length, records.length);
 
   // 8. 保存依赖图
   if (!quiet) process.stderr.write("提取依赖图...\n");
+  onProgress?.("deps", 0, files.length);
   const graphs: DepGraph[] = [];
   for (const f of files) {
     try {
