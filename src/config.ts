@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
-import { IndexConfig, OUTPUT_DIR } from "./types";
+import { IndexConfig } from "./types";
+import { getProjectDir, ensureProjectDir, findProjectByDir, listProjects, getGlobalDir } from "./global";
 
 export function resolveDimensions(chunkCount: number, strategy: string): number {
   switch (strategy) {
@@ -23,36 +24,67 @@ export function saveConfig(configPath: string, config: IndexConfig): void {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
 }
 
-export function getOutputDir(baseDir: string = "."): string {
-  return path.resolve(baseDir, OUTPUT_DIR);
+export function getProjectOutputDir(projectName: string): string {
+  return getProjectDir(projectName);
 }
 
-export function ensureOutputDir(baseDir: string = "."): string {
-  const outDir = getOutputDir(baseDir);
-  if (!fs.existsSync(outDir)) {
-    fs.mkdirSync(outDir, { recursive: true });
+export function ensureProjectOutputDir(projectName: string): string {
+  return ensureProjectDir(projectName);
+}
+
+export async function showStatus(projectName?: string): Promise<void> {
+  if (projectName) {
+    showProjectStatus(projectName);
+    return;
   }
-  return outDir;
+
+  // 尝试根据 cwd 找到项目
+  const entry = findProjectByDir(".");
+  if (entry) {
+    showProjectStatus(entry.name);
+    return;
+  }
+
+  // 没有指定项目，列出所有
+  const projects = listProjects();
+  if (projects.length === 0) {
+    console.log("没有已注册的项目。运行 `codesense init` 初始化。");
+    return;
+  }
+
+  console.log("codesense 全局状态:");
+  console.log(`  目录: ${getGlobalDir()}`);
+  console.log(`  已注册项目: ${projects.length}\n`);
+  for (const p of projects) {
+    console.log(`  ${p.name}`);
+    console.log(`    路径: ${p.path}`);
+    const configPath = path.join(getProjectDir(p.name), "config.json");
+    const config = loadConfig(configPath);
+    if (config) {
+      console.log(`    模型: ${config.model}  维度: ${config.dimensions}  更新: ${config.updatedAt}`);
+    } else {
+      console.log(`    (未建索引)`);
+    }
+  }
 }
 
-export async function showStatus(): Promise<void> {
-  const outDir = getOutputDir();
+function showProjectStatus(projectName: string): void {
+  const outDir = getProjectDir(projectName);
   const configPath = path.join(outDir, "config.json");
   const config = loadConfig(configPath);
 
   if (!config) {
-    console.log("未找到索引。运行 `codesense index <目录>` 建立索引。");
+    console.log(`项目 "${projectName}" 未建索引。运行 \`codesense index <目录>\` 建立索引。`);
     return;
   }
 
-  console.log("codesense 索引状态:");
+  console.log(`codesense 索引状态 [${projectName}]:`);
   console.log(`  模型:     ${config.model}`);
   console.log(`  维度:     ${config.dimensions}`);
   console.log(`  策略:     ${config.strategy}`);
   console.log(`  创建时间: ${config.createdAt}`);
   console.log(`  更新时间: ${config.updatedAt}`);
 
-  // 尝试获取 chunk 数量
   const manifestPath = path.join(outDir, "manifest.json");
   if (fs.existsSync(manifestPath)) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));

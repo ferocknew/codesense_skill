@@ -1,9 +1,10 @@
 import * as fs from "fs";
 import * as path from "path";
-import { SearchResult, DEFAULT_TOP_K, DEFAULT_THRESHOLD, OUTPUT_DIR } from "./types";
+import { SearchResult, DEFAULT_TOP_K, DEFAULT_THRESHOLD } from "./types";
 import { OllamaEmbedder } from "./embedder";
 import { queryTable } from "./index";
-import { loadConfig, getOutputDir } from "./config";
+import { loadConfig } from "./config";
+import { findProjectByDir, getProjectDir, resolveProjectName, listProjects } from "./global";
 
 export interface SearchOptions {
   topK?: number;
@@ -11,46 +12,34 @@ export interface SearchOptions {
   lang?: string;
   dir?: string;
   threshold?: number;
-  baseDir?: string;
+  project?: string;
 }
 
-// 向上查找包含 codesense-out 的目录
-function findIndexDir(startDir: string): string | null {
-  let dir = path.resolve(startDir);
-  for (let i = 0; i < 10; i++) {
-    if (fs.existsSync(path.join(dir, OUTPUT_DIR, "config.json"))) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+function resolveProjectNameOpt(projectOpt?: string): string | null {
+  if (projectOpt && projectOpt !== "all") {
+    return projectOpt;
   }
-  return null;
+  const entry = findProjectByDir(".");
+  if (entry) return entry.name;
+  return resolveProjectName(".");
 }
 
-export async function search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
+async function searchSingleProject(
+  query: string,
+  projectName: string,
+  options: SearchOptions
+): Promise<SearchResult[]> {
   const topK = options.topK || DEFAULT_TOP_K;
   const threshold = options.threshold ?? DEFAULT_THRESHOLD;
+  const outDir = getProjectDir(projectName);
 
-  const indexDir = findIndexDir(options.baseDir || ".");
-  if (!indexDir) {
-    console.error("未找到索引。运行 `codesense index <目录>` 建立索引。");
-    process.exit(1);
-  }
-  const outDir = getOutputDir(indexDir);
+  const configPath = path.join(outDir, "config.json");
+  const config = loadConfig(configPath);
+  if (!config) return [];
 
-  // 加载配置获取维度
-  const config = loadConfig(path.join(outDir, "config.json"));
-  if (!config) {
-    console.error("未找到索引。运行 `codesense index <目录>` 建立索引。");
-    process.exit(1);
-  }
-
-  // 生成查询向量
   const embedder = new OllamaEmbedder({ dimensions: config.dimensions });
   const queryVector = await embedder.embedQuery(query);
 
-  // 构建 where 条件
   const conditions: string[] = [];
   if (options.type) {
     conditions.push(`"chunkType" = '${options.type}'`);
@@ -63,12 +52,12 @@ export async function search(query: string, options: SearchOptions = {}): Promis
   }
   const where = conditions.length > 0 ? conditions.join(" AND ") : undefined;
 
-  // 查询
   const dbPath = path.join(outDir, "index.lance");
+  if (!fs.existsSync(dbPath)) return [];
+
   const rawResults = await queryTable(dbPath, queryVector, { limit: topK, where });
 
-  // 格式化结果（L2 距离 → 相似度分数: 1/(1+distance)）
-  const results: SearchResult[] = rawResults
+  return rawResults
     .map((r: any) => ({
       score: r._distance !== undefined ? 1 / (1 + r._distance) : 0,
       symbol: r.symbol || "",
@@ -80,6 +69,33 @@ export async function search(query: string, options: SearchOptions = {}): Promis
       context: r.context || "",
     }))
     .filter((r: SearchResult) => r.score >= threshold);
+}
 
-  return results;
+export async function search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
+  // 全项目搜索
+  if (options.project === "all") {
+    const projects = listProjects();
+    const allResults: SearchResult[] = [];
+    for (const p of projects) {
+      const results = await searchSingleProject(query, p.name, options);
+      allResults.push(...results);
+    }
+    const topK = options.topK || DEFAULT_TOP_K;
+    return allResults.sort((a, b) => b.score - a.score).slice(0, topK);
+  }
+
+  // 单项目搜索
+  const projectName = resolveProjectNameOpt(options.project);
+  if (!projectName) {
+    console.error("未找到项目。运行 `codesense init` 初始化。");
+    process.exit(1);
+  }
+
+  const outDir = getProjectDir(projectName);
+  if (!fs.existsSync(outDir)) {
+    console.error(`项目 "${projectName}" 未建索引。运行 \`codesense index <目录>\` 建立索引。`);
+    process.exit(1);
+  }
+
+  return searchSingleProject(query, projectName, options);
 }

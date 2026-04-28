@@ -1,25 +1,29 @@
 import * as fs from "fs";
 import * as path from "path";
-import { CodeChunk, OUTPUT_DIR } from "./types";
+import { CodeChunk } from "./types";
 import { OllamaEmbedder } from "./embedder";
 import { chunkFile, buildEmbeddingInput } from "./chunker";
 import { scanDirectory } from "./file-scanner";
 import { addToTable, deleteFromTable } from "./index";
 import { buildManifest, loadManifest, saveManifest, diffManifests } from "./manifest";
-import { loadConfig, saveConfig, getOutputDir } from "./config";
+import { loadConfig, saveConfig } from "./config";
 import { extractDeps, loadDepGraph, saveDepGraph, removeFileFromGraph, mergeDepGraphs } from "./graph";
+import { findProjectByDir, resolveProjectName, getProjectDir, ensureProjectDir } from "./global";
 
-// 向上查找索引目录
-function findIndexDir(startDir: string): string | null {
-  let dir = path.resolve(startDir);
-  for (let i = 0; i < 10; i++) {
-    if (fs.existsSync(path.join(dir, OUTPUT_DIR, "config.json"))) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+function resolveProject(dir: string): { projectName: string; indexDir: string } | null {
+  // 优先从 registry 查找
+  const entry = findProjectByDir(dir);
+  if (entry) {
+    return { projectName: entry.name, indexDir: entry.path };
   }
+
+  // 回退到目录名
+  const projectName = resolveProjectName(dir);
+  const projectDir = getProjectDir(projectName);
+  if (fs.existsSync(path.join(projectDir, "config.json"))) {
+    return { projectName, indexDir: path.resolve(dir) };
+  }
+
   return null;
 }
 
@@ -28,13 +32,14 @@ export async function updateIndex(
   options: { quiet?: boolean } = {}
 ): Promise<void> {
   const quiet = options.quiet || false;
-  const indexDir = findIndexDir(dir);
-  if (!indexDir) {
+  const resolved = resolveProject(dir);
+  if (!resolved) {
     if (!quiet) console.error("未找到索引。运行 `codesense index <目录>` 建立索引。");
     process.exit(1);
   }
 
-  const outDir = getOutputDir(indexDir);
+  const { projectName, indexDir } = resolved;
+  const outDir = ensureProjectDir(projectName);
   const configPath = path.join(outDir, "config.json");
   const config = loadConfig(configPath);
   if (!config) {
@@ -76,7 +81,6 @@ export async function updateIndex(
     if (!quiet) process.stderr.write(`删除 ${diff.deleted.length} 个文件的索引...\n`);
     await deleteFromTable(dbPath, deletedRelative);
 
-    // 从 deps.json 中移除
     let depGraph = loadDepGraph(path.join(outDir, "deps.json"));
     for (const fp of deletedRelative) {
       depGraph = removeFileFromGraph(depGraph, fp);

@@ -1,6 +1,3 @@
-import * as path from "path";
-import { OUTPUT_DIR } from "./types";
-
 interface LanceRecord {
   vector: number[];
   text: string;
@@ -19,10 +16,9 @@ async function getLanceDB(): Promise<any> {
   return require("@lancedb/lancedb");
 }
 
-export async function connect(dbPath?: string) {
+export async function connect(dbPath: string) {
   const lancedb = await getLanceDB();
-  const dir = dbPath || path.resolve(OUTPUT_DIR);
-  return await lancedb.connect(dir);
+  return await lancedb.connect(dbPath);
 }
 
 export async function createTable(

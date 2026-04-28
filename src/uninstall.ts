@@ -1,10 +1,25 @@
 import * as fs from "fs";
 import * as path from "path";
 import { CLAUDE_MD_MARKER, CLAUDE_MD_END_MARKER, HOOK_MARKER } from "./install";
+import { unregisterProject, resolveProjectName, getProjectDir } from "./global";
 
-export async function uninstall(): Promise<void> {
-  // Step 1: 移除 CLAUDE.md 中的 codesense 段落
-  const claudeMdPath = path.resolve("CLAUDE.md");
+export async function uninstall(projectDir?: string): Promise<void> {
+  const absDir = path.resolve(projectDir || ".");
+  const projectName = resolveProjectName(absDir);
+
+  // Step 1: 从 registry 移除项目
+  unregisterProject(projectName);
+  console.log(`✓ 项目 "${projectName}" 已从 registry 移除`);
+
+  // Step 2: 清理索引数据
+  const projectDataDir = getProjectDir(projectName);
+  if (fs.existsSync(projectDataDir)) {
+    fs.rmSync(projectDataDir, { recursive: true, force: true });
+    console.log(`✓ 已清理索引数据: ${projectDataDir}`);
+  }
+
+  // Step 3: 移除 CLAUDE.md 中的 codesense 段落
+  const claudeMdPath = path.resolve(absDir, "CLAUDE.md");
   if (fs.existsSync(claudeMdPath)) {
     let content = fs.readFileSync(claudeMdPath, "utf-8");
     if (content.includes(CLAUDE_MD_MARKER)) {
@@ -22,18 +37,17 @@ export async function uninstall(): Promise<void> {
         console.log("✓ 已从 CLAUDE.md 移除 codesense 段落");
       }
     } else {
-      console.log("CLAUDE.md 中未找到 codesense 段落。");
+      console.log("  CLAUDE.md 中未找到 codesense 段落。");
     }
   }
 
-  // Step 2: 移除 git hook 中的 codesense 部分
-  const hookPath = path.resolve(".git", "hooks", "post-commit");
+  // Step 4: 移除 git hook 中的 codesense 部分
+  const hookPath = path.resolve(absDir, ".git", "hooks", "post-commit");
   if (fs.existsSync(hookPath)) {
     let content = fs.readFileSync(hookPath, "utf-8");
     if (content.includes(HOOK_MARKER)) {
-      // 移除 codesense 相关行
       const lines = content.split("\n");
-      const filtered = [];
+      const filtered: string[] = [];
       let skip = false;
       for (const line of lines) {
         if (line.includes(HOOK_MARKER)) {
@@ -56,9 +70,9 @@ export async function uninstall(): Promise<void> {
         console.log("✓ 已删除空的 post-commit hook");
       }
     } else {
-      console.log("post-commit hook 中未找到 codesense 部分。");
+      console.log("  post-commit hook 中未找到 codesense 部分。");
     }
   }
 
-  console.log("codesense 集成已卸载。索引数据（codesense-out/）未删除。");
+  console.log(`\ncodesense 集成已卸载。项目: ${projectName}`);
 }

@@ -53,7 +53,7 @@ const external = [
 
 try {
   buildSync({
-    entryPoints: ["run.js"],
+    entryPoints: ["src/cli.ts"],
     bundle: true,
     platform: "node",
     outfile: "skill.js",
@@ -78,9 +78,10 @@ updateSkillVersion(version);
 console.log("\n打包完成！");
 console.log(`版本号: v${version}`);
 console.log("\n使用方式:");
-console.log("  node skill.js index <目录路径>");
-console.log("  node skill.js search \"查询语句\"");
-console.log("  node skill.js trace <符号名>");
-console.log("  node skill.js status");
-console.log("  node skill.js update");
-console.log("  node skill.js install");
+console.log("  node skill.js init            # 初始化（环境检查 + 注册项目）");
+console.log("  node skill.js list            # 列出已注册项目");
+console.log("  node skill.js index <目录>    # 建立索引");
+console.log("  node skill.js search \"查询\"   # 语义搜索");
+console.log("  node skill.js trace <符号>    # 依赖追踪");
+console.log("  node skill.js update          # 增量更新");
+console.log("  node skill.js status          # 查看状态");

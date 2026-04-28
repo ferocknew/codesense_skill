@@ -1,8 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
-import { DepGraph, TraceNode, OUTPUT_DIR } from "./types";
+import { DepGraph, TraceNode } from "./types";
 import { loadDepGraph } from "./graph";
-import { getOutputDir } from "./config";
+import { findProjectByDir, resolveProjectName, getProjectDir } from "./global";
 
 export interface TraceOptions {
   depth?: number;
@@ -11,17 +11,15 @@ export interface TraceOptions {
   baseDir?: string;
 }
 
-// 查找索引目录（向上搜索）
-function findIndexDir(startDir: string): string | null {
-  let dir = path.resolve(startDir);
-  for (let i = 0; i < 10; i++) {
-    if (fs.existsSync(path.join(dir, OUTPUT_DIR, "deps.json"))) {
-      return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
+// 查找项目索引目录
+function resolveProjectDir(startDir: string): string | null {
+  const entry = findProjectByDir(startDir);
+  if (entry) return getProjectDir(entry.name);
+
+  const projectName = resolveProjectName(startDir);
+  const projectDir = getProjectDir(projectName);
+  if (fs.existsSync(path.join(projectDir, "deps.json"))) return projectDir;
+
   return null;
 }
 
@@ -177,13 +175,13 @@ export async function trace(symbol: string, options: TraceOptions = {}): Promise
   const direction = options.direction || "both";
   const format = options.format || "tree";
 
-  const indexDir = findIndexDir(options.baseDir || ".");
-  if (!indexDir) {
+  const projectDir = resolveProjectDir(options.baseDir || ".");
+  if (!projectDir) {
     console.error("未找到索引。运行 `codesense index <目录>` 建立索引。");
     process.exit(1);
   }
 
-  const depsPath = path.join(getOutputDir(indexDir), "deps.json");
+  const depsPath = path.join(projectDir, "deps.json");
   const graph = loadDepGraph(depsPath);
 
   // 查找匹配节点

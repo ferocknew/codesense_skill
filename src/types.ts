@@ -78,7 +78,6 @@ export interface TraceNode {
 export type Manifest = Record<string, string>;
 
 // 常量
-export const OUTPUT_DIR = "codesense-out";
 export const DEFAULT_BATCH_SIZE = 32;
 export const DEFAULT_TOP_K = 10;
 export const DEFAULT_THRESHOLD = 0.5;

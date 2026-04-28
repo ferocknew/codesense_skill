@@ -6,8 +6,9 @@ import { chunkFile, buildEmbeddingInput } from "./chunker";
 import { scanDirectory } from "./file-scanner";
 import { createTable } from "./index";
 import { buildManifest, saveManifest } from "./manifest";
-import { saveConfig, resolveDimensions, ensureOutputDir } from "./config";
+import { saveConfig, resolveDimensions, ensureProjectOutputDir } from "./config";
 import { extractDeps, mergeDepGraphs, saveDepGraph } from "./graph";
+import { resolveProjectName, registerProject } from "./global";
 
 export async function buildIndex(
   dir: string,
@@ -16,6 +17,7 @@ export async function buildIndex(
   const strategy = options.strategy || "auto";
   const quiet = options.quiet || false;
   const absDir = path.resolve(dir);
+  const projectName = resolveProjectName(absDir);
 
   // 1. 扫描文件
   const files = scanDirectory(absDir);
@@ -70,8 +72,8 @@ export async function buildIndex(
     context: chunk.context,
   }));
 
-  // 7. 写入 LanceDB
-  const outDir = ensureOutputDir(absDir);
+  // 7. 写入 LanceDB（全局目录）
+  const outDir = ensureProjectOutputDir(projectName);
   const dbPath = path.join(outDir, "index.lance");
   if (!quiet) process.stderr.write("写入索引...\n");
   await createTable(dbPath, records);
@@ -96,7 +98,7 @@ export async function buildIndex(
   const manifest = await buildManifest(filePaths);
   saveManifest(path.join(outDir, "manifest.json"), manifest);
 
-  // 10. 保存配置（使用实际向量维度）
+  // 10. 保存配置
   const actualDimensions = vectors[0]?.length || dimensions;
   const config = {
     model: embedder.getConfig().model,
@@ -108,8 +110,12 @@ export async function buildIndex(
   };
   saveConfig(path.join(outDir, "config.json"), config);
 
+  // 11. 注册项目
+  registerProject(projectName, absDir);
+
   if (!quiet) {
     console.log(`\n索引构建完成！`);
+    console.log(`  项目:     ${projectName}`);
     console.log(`  文件数:   ${files.length}`);
     console.log(`  代码块:   ${allChunks.length}`);
     console.log(`  维度:     ${dimensions}`);

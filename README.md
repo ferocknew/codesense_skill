@@ -17,11 +17,19 @@ ollama pull qwen3-embedding:0.6b
 node build.js
 ```
 
+> **入口文件说明**：`run.js` 是开发时的入口（通过 esbuild 即时编译 TypeScript），`skill.js` 是构建产物，作为 Claude Code skill 的使用入口。日常开发用 `node run.js`，skill 调用用 `node skill.js`。
+
 ## 使用
 
 ```bash
+# 初始化（检查环境 + 注册项目）
+node skill.js init
+
 # 建立索引
 node skill.js index <目录路径>
+
+# 列出已注册项目
+node skill.js list
 
 # 语义搜索
 node skill.js search "怎么处理认证？"
@@ -40,6 +48,36 @@ node skill.js install
 
 # 卸载集成
 node skill.js uninstall
+```
+
+## 实际效果
+
+**语义搜索** — 用自然语言描述意图，找到对应代码：
+
+```bash
+node skill.js search "JWT authentication"
+```
+
+```
+→ src/auth/middleware.ts:45  verifyToken()      score: 0.89
+→ src/services/session.ts:78 validateSession()  score: 0.84
+→ src/routes/login.ts:12     handleLogin()      score: 0.76
+```
+
+**依赖追踪** — 从一个符号出发，展开完整调用链：
+
+```bash
+node skill.js trace "verifyToken"
+```
+
+```
+verifyToken() [src/auth/middleware.ts:45]
+  ├── callers
+  │   ├── apiRouter()         [src/routes/api.ts:23]
+  │   └── LoggingMiddleware() [src/middleware/log.ts:12]
+  └── callees
+      ├── jwt.decode()        [external]
+      └── raise AuthError     [src/errors.ts:8]
 ```
 
 ### search 参数

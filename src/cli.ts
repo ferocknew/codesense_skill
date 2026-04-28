@@ -12,103 +12,24 @@ program
   .description("本地语义代码搜索 - 通过向量索引定位代码片段，支持 AST 依赖追踪")
   .version(VERSION);
 
-// index 命令
-program
-  .command("index")
-  .description("为指定目录建立语义索引")
-  .argument("[path]", "目标目录", ".")
-  .option("--strategy <strategy>", "维度策略: auto | quality | performance", "auto")
-  .option("--background", "后台模式构建索引（大型项目）")
-  .action(async (path: string, options: { strategy: string; background: boolean }) => {
-    const { buildIndex } = await require("./indexer");
-    await buildIndex(path, { strategy: options.strategy, quiet: false });
-  });
+// 静态导入所有命令注册模块（确保 esbuild 可以 bundle）
+import { register as registerInit } from "../scripts/init";
+import { register as registerList } from "../scripts/list";
+import { register as registerIndex } from "../scripts/index_cmd";
+import { register as registerSearch } from "../scripts/search";
+import { register as registerTrace } from "../scripts/trace";
+import { register as registerUpdate } from "../scripts/update";
+import { register as registerStatus } from "../scripts/status";
+import { register as registerUninstall } from "../scripts/uninstall";
 
-// search 命令
-program
-  .command("search")
-  .description("语义搜索代码")
-  .argument("<query>", "搜索查询（支持中英文）")
-  .option("-k, --top-k <number>", "返回结果数量", "10")
-  .option("-t, --type <type>", "过滤符号类型: function | class | module")
-  .option("-l, --lang <lang>", "过滤语言: python | typescript | go ...")
-  .option("-d, --dir <dir>", "过滤目录前缀")
-  .option("--threshold <number>", "相似度阈值 (0-1)", "0.5")
-  .action(
-    async (
-      query: string,
-      options: { topK: string; type?: string; lang?: string; dir?: string; threshold: string }
-    ) => {
-      const { search } = await require("./search");
-      const results = await search(query, {
-        topK: parseInt(options.topK, 10),
-        type: options.type,
-        lang: options.lang,
-        dir: options.dir,
-        threshold: parseFloat(options.threshold),
-      });
-      console.log(JSON.stringify({ results }, null, 2));
-    }
-  );
-
-// trace 命令
-program
-  .command("trace")
-  .description("追踪符号的依赖关系")
-  .argument("<symbol>", "符号名称")
-  .option("--depth <number>", "展开深度", "3")
-  .option("--direction <direction>", "方向: callers | callees | both", "both")
-  .option("--format <format>", "输出格式: tree | json | dot", "tree")
-  .action(
-    async (
-      symbol: string,
-      options: { depth: string; direction: string; format: string }
-    ) => {
-      const { trace } = await require("./trace");
-      await trace(symbol, {
-        depth: parseInt(options.depth, 10),
-        direction: options.direction as "callers" | "callees" | "both",
-        format: options.format as "tree" | "json" | "dot",
-      });
-    }
-  );
-
-// update 命令
-program
-  .command("update")
-  .description("增量更新索引（只处理变更文件）")
-  .option("-q, --quiet", "静默模式")
-  .action(async (options: { quiet: boolean }) => {
-    const { updateIndex } = await require("./update");
-    await updateIndex(".", { quiet: options.quiet });
-  });
-
-// status 命令
-program
-  .command("status")
-  .description("查看索引状态")
-  .action(async () => {
-    const { showStatus } = await require("./config");
-    await showStatus();
-  });
-
-// install 命令
-program
-  .command("install")
-  .description("安装项目集成（CLAUDE.md 注入 + git hook）")
-  .action(async () => {
-    const { install } = await require("./install");
-    await install();
-  });
-
-// uninstall 命令
-program
-  .command("uninstall")
-  .description("卸载项目集成")
-  .action(async () => {
-    const { uninstall } = await require("./uninstall");
-    await uninstall();
-  });
+registerInit(program);
+registerList(program);
+registerIndex(program);
+registerSearch(program);
+registerTrace(program);
+registerUpdate(program);
+registerStatus(program);
+registerUninstall(program);
 
 // embed-test 隐藏命令（调试用）
 program
