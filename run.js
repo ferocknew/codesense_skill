@@ -5,9 +5,9 @@ const { buildSync } = require("esbuild");
 const { execFileSync } = require("child_process");
 const path = require("path");
 const fs = require("fs");
-const os = require("os");
+const os = require("os"); // kept for potential future use
 
-const tmpFile = path.join(os.tmpdir(), `codesense-dev-${Date.now()}.js`);
+const tmpFile = path.join(__dirname, `.codesense-dev-${Date.now()}.js`);
 
 const external = [
   "tree-sitter",

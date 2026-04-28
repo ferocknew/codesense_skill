@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+<!-- codesense-start -->
+## codesense
+
+本项目有 codesense 语义代码索引。
+
+Rules:
+- 回答"这段代码在哪"、"怎么实现 X"类问题时，先运行 `node "/Volumes/1T_M2/Downloads/code/codesense_skill/skill.js" search "<问题描述>"`
+- 需要理解调用链、影响范围时，运行 `node "/Volumes/1T_M2/Downloads/code/codesense_skill/skill.js" trace "<符号名>"`
+- 修改代码后，运行 `node "/Volumes/1T_M2/Downloads/code/codesense_skill/skill.js" update` 增量更新（如已安装 hook 则自动触发）
+- 搜索返回的是 chunk 级结果，仍需读取源文件确认完整上下文
+<!-- codesense-end -->
+
 ## 项目简介
 
 **codesense** 是一个 Claude Code skill，为本地代码库建立向量语义索引，让 Claude 能通过语义搜索精准定位代码片段。Node.js/TypeScript 实现，依赖 Ollama 本地 embedding（零 API 成本）。
@@ -59,7 +71,12 @@ src/
 ├── trace.ts        # 依赖追踪（沿 deps.json 展开 callers/callees）
 ├── update.ts       # 增量更新（对比 manifest，只处理变更 chunk）
 ├── install.ts      # init 命令实现（环境检查 + 全局目录 + CLAUDE.md 注入 + git hook）
-└── uninstall.ts    # 卸载集成（从 registry 移除 + 清理索引数据）
+├── uninstall.ts    # 卸载集成（从 registry 移除 + 清理索引数据）
+├── server.ts       # HTTP 服务器（端口 54321，REST API + SSE 实时推送）
+├── server-state.ts # 服务器内存状态（项目索引状态追踪）
+├── auto-indexer.ts # 定时轮询自动索引（遍历注册项目，增量更新 + SSE 广播）
+└── html/
+    └── index.ts    # HTML 仪表板模板（内联 CSS/JS，SSE 客户端）
 
 scripts/
 ├── init.ts         # init 命令注册
@@ -69,6 +86,7 @@ scripts/
 ├── trace.ts        # trace 命令注册
 ├── update.ts       # update 命令注册
 ├── status.ts       # status 命令注册
+├── server.ts       # server 命令注册（--port, --interval）
 └── uninstall.ts    # uninstall 命令注册
 ```
 
@@ -108,3 +126,26 @@ scripts/
 │       └── config.json  # 索引配置（模型、维度、策略）
 └── cache/
 ```
+
+## 变更记录
+
+### 2026-04-28 全局化改造
+
+**目标**：将项目本地索引模式改为全局管理模式（`docs/update.md`）
+
+**核心变更**：
+1. **新增 `src/global.ts`** — 全局目录管理（`~/.codesense/`、registry.json、项目注册/注销）
+2. **`install` → `init`** — 环境检查（Ollama + 模型）→ 创建全局目录 → 注册项目 → CLAUDE.md + git hook
+3. **索引路径迁移** — 从本地 `codesense-out/` 改为 `~/.codesense/projects/<name>/`，涉及 config.ts、indexer.ts、search.ts、update.ts、trace.ts、index.ts
+4. **新增 `list` 命令** — 列出所有已注册项目及索引状态
+5. **`search --project`** — 支持指定项目名或 `--project all` 跨项目搜索
+6. **`scripts/` 命令拆分** — 8 个命令注册文件，每个导出 `register(program)`，cli.ts 静态导入
+7. **`run.js` 改造** — 开发模式改为 esbuild 即时编译（原 require ts 方式不可用）
+8. **`build.js`** — entryPoints 从 `run.js` 改为 `src/cli.ts`
+
+**踩坑与解决**：
+- esbuild 不支持动态 `require()` 路径 → cli.ts 改为静态 import 所有 scripts/
+- `run.js` 直接 require `.ts` 文件失败 → 改为 esbuild 即时编译到 tmp 文件再执行
+- `build.js` 的 entryPoints 曾指向 `run.js`（esbuild 包装器）导致 skill.js 卡住 → 改为 `src/cli.ts`
+- `OUTPUT_DIR` 常量删除后，trace.ts 仍引用旧常量和 getOutputDir → 一并迁移到 global.ts 的项目目录解析
+

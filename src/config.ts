@@ -3,15 +3,15 @@ import * as path from "path";
 import { IndexConfig } from "./types";
 import { getProjectDir, ensureProjectDir, findProjectByDir, listProjects, getGlobalDir } from "./global";
 
-export function resolveDimensions(chunkCount: number, strategy: string): number {
+export function resolveDimensions(_chunkCount: number, strategy: string): number {
   switch (strategy) {
     case "quality":
-      return 2048;
-    case "performance":
       return 1024;
+    case "performance":
+      return 512;
     case "auto":
     default:
-      return chunkCount < 5000 ? 2048 : 1024;
+      return 1024;
   }
 }
 

@@ -12,10 +12,11 @@ import { resolveProjectName, registerProject } from "./global";
 
 export async function buildIndex(
   dir: string,
-  options: { strategy?: string; quiet?: boolean } = {}
+  options: { strategy?: string; quiet?: boolean; exitOnError?: boolean } = {}
 ): Promise<void> {
   const strategy = options.strategy || "auto";
   const quiet = options.quiet || false;
+  const exitOnError = options.exitOnError !== false;
   const absDir = path.resolve(dir);
   const projectName = resolveProjectName(absDir);
 
@@ -23,7 +24,8 @@ export async function buildIndex(
   const files = scanDirectory(absDir);
   if (files.length === 0) {
     console.error("未找到支持的代码文件。");
-    process.exit(1);
+    if (exitOnError) process.exit(1);
+    throw new Error("未找到支持的代码文件。");
   }
   if (!quiet) console.log(`找到 ${files.length} 个代码文件`);
 
@@ -40,7 +42,8 @@ export async function buildIndex(
   }
   if (allChunks.length === 0) {
     console.error("分块后无有效代码片段。");
-    process.exit(1);
+    if (exitOnError) process.exit(1);
+    throw new Error("分块后无有效代码片段。");
   }
   if (!quiet) console.log(`生成 ${allChunks.length} 个代码块`);
 

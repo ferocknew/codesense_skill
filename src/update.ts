@@ -29,13 +29,15 @@ function resolveProject(dir: string): { projectName: string; indexDir: string } 
 
 export async function updateIndex(
   dir: string,
-  options: { quiet?: boolean } = {}
+  options: { quiet?: boolean; exitOnError?: boolean } = {}
 ): Promise<void> {
   const quiet = options.quiet || false;
+  const exitOnError = options.exitOnError !== false;
   const resolved = resolveProject(dir);
   if (!resolved) {
     if (!quiet) console.error("未找到索引。运行 `codesense index <目录>` 建立索引。");
-    process.exit(1);
+    if (exitOnError) process.exit(1);
+    throw new Error("未找到索引。运行 `codesense index <目录>` 建立索引。");
   }
 
   const { projectName, indexDir } = resolved;
@@ -44,7 +46,8 @@ export async function updateIndex(
   const config = loadConfig(configPath);
   if (!config) {
     if (!quiet) console.error("索引配置损坏。请重新运行 `codesense index`。");
-    process.exit(1);
+    if (exitOnError) process.exit(1);
+    throw new Error("索引配置损坏。请重新运行 `codesense index`。");
   }
 
   // 加载旧 manifest
