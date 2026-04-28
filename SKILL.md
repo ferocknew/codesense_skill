@@ -1,7 +1,7 @@
 ---
 name: codesense
 description: "本地语义代码搜索 - 通过向量索引定位代码片段，支持 AST 依赖追踪。触发：/codesense"
-version: 260428.202842
+version: 260428.204211
 trigger: /codesense
 triggers:
   - codesense
@@ -56,6 +56,9 @@ node "$CLAUDE_SKILL_DIR/skill.js" update
 
 # 查看状态
 node "$CLAUDE_SKILL_DIR/skill.js" status
+
+# 启动 Web Dashboard（默认 http://localhost:54321）
+node "$CLAUDE_SKILL_DIR/skill.js" server [--port 54321]
 ```
 
 ## 命令参考
@@ -96,6 +99,13 @@ node "$CLAUDE_SKILL_DIR/skill.js" status
 
 ### status [project]
 查看索引状态。可指定项目名，默认显示当前项目或全部项目。
+
+### server
+启动 HTTP 服务器，提供 Web Dashboard 和 REST API。
+- `--port N` 端口号（默认 54321）
+- Dashboard: `http://localhost:54321/`
+- API: `/api/projects`, `/api/search?q=...`, `/api/graph/<name>`, `/api/index/<name>`, `/api/update/<name>`
+- SSE 实时推送: `/api/events`
 
 ### uninstall [path]
 卸载项目集成。从 registry 移除、清理索引数据、移除 CLAUDE.md 和 hook。
