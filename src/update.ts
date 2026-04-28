@@ -12,6 +12,7 @@ import { loadConfig, saveConfig } from "./config";
 import { extractDeps, removeFileFromGraph } from "./graph";
 import { findProjectByDir, resolveProjectName, ensureProjectDir } from "./global";
 import { dbSaveManifestIncremental } from "./database";
+import { appendLog } from "./logger";
 
 function resolveProject(dir: string): { projectName: string; indexDir: string } | null {
   const entry = findProjectByDir(dir);
@@ -230,15 +231,28 @@ export async function updateIndex(
 
   // 优先用 git diff 获取变更文件
   const gitFiles = getGitChangedFiles(indexDir);
+  const startTime = Date.now();
   if (gitFiles !== null) {
     if (gitFiles.length === 0) {
       if (!quiet) console.log("无变更文件。");
       return;
     }
-    await updateByFiles(projectName, indexDir, gitFiles, options);
+    try {
+      await updateByFiles(projectName, indexDir, gitFiles, options);
+      appendLog({ time: new Date().toISOString(), project: projectName, action: "update", status: "completed", files: gitFiles.length, durationMs: Date.now() - startTime });
+    } catch (e: any) {
+      appendLog({ time: new Date().toISOString(), project: projectName, action: "update", status: "failed", error: e.message, durationMs: Date.now() - startTime });
+      throw e;
+    }
     return;
   }
 
   // 回退：全量 manifest diff
-  await updateByManifest(dir, options);
+  try {
+    await updateByManifest(dir, options);
+    appendLog({ time: new Date().toISOString(), project: projectName, action: "update", status: "completed", durationMs: Date.now() - startTime });
+  } catch (e: any) {
+    appendLog({ time: new Date().toISOString(), project: projectName, action: "update", status: "failed", error: e.message, durationMs: Date.now() - startTime });
+    throw e;
+  }
 }
