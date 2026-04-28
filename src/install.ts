@@ -156,6 +156,9 @@ function integrateProject(absDir: string, projectName: string): void {
   registerProject(projectName, absDir);
   console.log(`✓ 项目 "${projectName}" 已注册`);
 
+  // 生成项目级配置
+  checkProjectConfig(absDir);
+
   // CLAUDE.md 检查与注入
   checkClaudeMd(absDir);
 
@@ -216,7 +219,7 @@ function checkGitHook(absDir: string): void {
   const hookDir = path.join(gitDir, "hooks");
   const hookPath = path.join(hookDir, "post-commit");
   const skillCmd = getSkillCommand();
-  const hookContent = `${HOOK_MARKER}\n${skillCmd} update --quiet 2>/dev/null || true`;
+  const hookContent = `${HOOK_MARKER}\n(${skillCmd} update --quiet </dev/null >/dev/null 2>&1 &) || true`;
 
   if (!fs.existsSync(hookDir)) {
     fs.mkdirSync(hookDir, { recursive: true });
