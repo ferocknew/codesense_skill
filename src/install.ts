@@ -202,8 +202,15 @@ function checkClaudeMd(absDir: string): void {
 function checkGitHook(absDir: string): void {
   const gitDir = path.resolve(absDir, ".git");
   if (!fs.existsSync(gitDir)) {
-    console.log("⚠ 未检测到 git 仓库，跳过 hook 安装。");
-    return;
+    console.log("⚠ 当前目录不是 git 仓库。");
+    console.log("  codesense 依赖 git 进行增量更新，正在执行 git init...");
+    try {
+      execSync("git init", { cwd: absDir, stdio: "inherit" });
+      console.log("✓ git 仓库已初始化");
+    } catch {
+      console.error("✗ git init 失败，请手动运行: git init");
+      process.exit(1);
+    }
   }
 
   const hookDir = path.join(gitDir, "hooks");

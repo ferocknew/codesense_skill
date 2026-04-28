@@ -26,7 +26,10 @@ export interface IndexConfig {
   strategy: "auto" | "quality" | "performance";
   createdAt: string;
   updatedAt: string;
+  excludeFiles?: string[];
 }
+
+export const DEFAULT_EXCLUDE_FILES = ["SKILL.md", "README.md", "CLAUDE.md"];
 
 export interface DepNode {
   symbol: string;

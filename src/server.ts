@@ -19,6 +19,7 @@ import { getTableStats } from "./index";
 import { search as searchCode } from "./search";
 import { loadDepGraph } from "./graph";
 import { closeDb, dbGetDepStats } from "./database";
+import { appendLog, queryLogs, listLogDates } from "./logger";
 
 export interface ServerOptions {
   port: number;
@@ -124,6 +125,10 @@ async function handleRequest(
       await triggerUpdate(res, state, name);
     } else if (pathname === "/api/search" && req.method === "GET") {
       await serveSearch(res, url);
+    } else if (pathname === "/api/logs" && req.method === "GET") {
+      serveLogs(res, url);
+    } else if (pathname === "/api/logs/dates" && req.method === "GET") {
+      serveLogDates(res);
     } else if (pathname === "/api/events" && req.method === "GET") {
       handleSSE(req, res);
     } else {
@@ -233,14 +238,17 @@ async function triggerIndex(
   try {
     const { buildIndex } = require("./indexer");
     await buildIndex(project.path, { quiet: true, exitOnError: false });
+    const durationMs = Date.now() - start;
     updateProjectState(state, name, {
       status: "completed",
       lastIndexAt: new Date().toISOString(),
-      lastDurationMs: Date.now() - start,
+      lastDurationMs: durationMs,
       error: null,
     });
+    appendLog({ time: new Date().toISOString(), project: name, action: "index", status: "completed", durationMs });
   } catch (err: any) {
     updateProjectState(state, name, { status: "failed", error: err.message });
+    appendLog({ time: new Date().toISOString(), project: name, action: "index", status: "failed", error: err.message });
   }
   broadcastSSE("index-progress", {
     type: "state",
@@ -277,20 +285,36 @@ async function triggerUpdate(
   try {
     const { updateIndex } = require("./update");
     await updateIndex(project.path, { quiet: true, exitOnError: false });
+    const durationMs = Date.now() - start;
     updateProjectState(state, name, {
       status: "completed",
       lastIndexAt: new Date().toISOString(),
-      lastDurationMs: Date.now() - start,
+      lastDurationMs: durationMs,
       error: null,
     });
+    appendLog({ time: new Date().toISOString(), project: name, action: "update", status: "completed", durationMs });
   } catch (err: any) {
     updateProjectState(state, name, { status: "failed", error: err.message });
+    appendLog({ time: new Date().toISOString(), project: name, action: "update", status: "failed", error: err.message });
   }
   broadcastSSE("index-progress", {
     type: "state",
     project: name,
     ...state.projects[name],
   });
+}
+
+function serveLogs(res: http.ServerResponse, url: URL): void {
+  const project = url.searchParams.get("project") || undefined;
+  const limit = parseInt(url.searchParams.get("limit") || "50", 10);
+  const date = url.searchParams.get("date") || undefined;
+  const logs = queryLogs({ project, limit, date });
+  sendJSON(res, 200, { ok: true, data: logs });
+}
+
+function serveLogDates(res: http.ServerResponse): void {
+  const dates = listLogDates();
+  sendJSON(res, 200, { ok: true, data: dates });
 }
 
 async function serveSearch(

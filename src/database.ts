@@ -114,9 +114,9 @@ function initializeDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_dep_edges_from ON dep_edges(from_id);
     CREATE INDEX IF NOT EXISTS idx_dep_edges_to ON dep_edges(to_id);
   `);
+  // Migration: add exclude_files column
+  try { db.exec("ALTER TABLE project_config ADD COLUMN exclude_files TEXT"); } catch {}
 }
-
-// --- JSON 迁移 ---
 
 function migrateFromJson(): void {
   const db = _db!;
@@ -270,8 +270,8 @@ export function dbSaveGlobalConfig(config: GlobalConfig): void {
 export function dbLoadConfig(projectName: string): IndexConfig | null {
   const db = getDb();
   const row = db.prepare(
-    "SELECT model, dimensions, dimensions_full, strategy, created_at, updated_at FROM project_config WHERE project_name = ?"
-  ).get(projectName) as { model: string; dimensions: number; dimensions_full: number; strategy: string; created_at: string; updated_at: string } | undefined;
+    "SELECT model, dimensions, dimensions_full, strategy, created_at, updated_at, exclude_files FROM project_config WHERE project_name = ?"
+  ).get(projectName) as { model: string; dimensions: number; dimensions_full: number; strategy: string; created_at: string; updated_at: string; exclude_files: string | null } | undefined;
   if (!row) return null;
   return {
     model: row.model,
@@ -280,14 +280,19 @@ export function dbLoadConfig(projectName: string): IndexConfig | null {
     strategy: row.strategy as IndexConfig["strategy"],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    excludeFiles: row.exclude_files ? JSON.parse(row.exclude_files) : undefined,
   };
 }
 
 export function dbSaveConfig(projectName: string, config: IndexConfig): void {
   const db = getDb();
   db.prepare(
-    "INSERT OR REPLACE INTO project_config (project_name, model, dimensions, dimensions_full, strategy, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(projectName, config.model, config.dimensions, config.dimensionsFull, config.strategy, config.createdAt, config.updatedAt);
+    "INSERT OR REPLACE INTO project_config (project_name, model, dimensions, dimensions_full, strategy, created_at, updated_at, exclude_files) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(
+    projectName, config.model, config.dimensions, config.dimensionsFull,
+    config.strategy, config.createdAt, config.updatedAt,
+    config.excludeFiles ? JSON.stringify(config.excludeFiles) : null
+  );
 }
 
 // --- Manifest ---
@@ -397,7 +402,9 @@ export function dbSaveDepGraph(projectName: string, graph: DepGraph): void {
 
     const edgeStmt = db.prepare("INSERT INTO dep_edges (project_name, from_id, to_id, relation, confidence) VALUES (?, ?, ?, ?, ?)");
     for (const edge of graph.edges) {
-      edgeStmt.run(projectName, edge.from, edge.to, edge.relation, edge.confidence);
+      if (typeof edge.from === "string" && typeof edge.to === "string") {
+        edgeStmt.run(projectName, edge.from, edge.to, edge.relation || "calls", edge.confidence || "EXTRACTED");
+      }
     }
   });
   tx();

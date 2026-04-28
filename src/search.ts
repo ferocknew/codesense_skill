@@ -1,10 +1,11 @@
 import * as fs from "fs";
 import * as path from "path";
-import { SearchResult, DEFAULT_TOP_K, DEFAULT_THRESHOLD } from "./types";
+import { SearchResult, DEFAULT_TOP_K, DEFAULT_THRESHOLD, DEFAULT_EXCLUDE_FILES } from "./types";
 import { OllamaEmbedder } from "./embedder";
 import { queryTable } from "./index";
 import { loadConfig } from "./config";
 import { findProjectByDir, getProjectDir, resolveProjectName, listProjects } from "./global";
+import { matchExcludePattern } from "./file-scanner";
 
 export interface SearchOptions {
   topK?: number;
@@ -35,6 +36,8 @@ async function searchSingleProject(
 
   const config = loadConfig(projectName);
   if (!config) return [];
+
+  const excludeFiles = config.excludeFiles ?? DEFAULT_EXCLUDE_FILES;
 
   const embedder = new OllamaEmbedder({ dimensions: config.dimensions });
   const queryVector = await embedder.embedQuery(query);
@@ -67,7 +70,8 @@ async function searchSingleProject(
       text: r.text || "",
       context: r.context || "",
     }))
-    .filter((r: SearchResult) => r.score >= threshold);
+    .filter((r: SearchResult) => r.score >= threshold)
+    .filter((r: SearchResult) => !matchExcludePattern(r.file, excludeFiles));
 }
 
 export async function search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {

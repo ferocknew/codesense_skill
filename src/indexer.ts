@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { CodeChunk, DepGraph, IndexConfig } from "./types";
+import { CodeChunk, DepGraph, IndexConfig, DEFAULT_EXCLUDE_FILES } from "./types";
 import { OllamaEmbedder } from "./embedder";
 import { chunkFile, buildEmbeddingInput } from "./chunker";
 import { scanDirectory } from "./file-scanner";
@@ -110,6 +110,7 @@ export async function buildIndex(
     strategy: strategy as IndexConfig["strategy"],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    excludeFiles: [...DEFAULT_EXCLUDE_FILES],
   };
   saveConfig(projectName, config);
 

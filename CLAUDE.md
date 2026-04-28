@@ -2,6 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+
 <!-- codesense-start -->
 ## codesense
 
@@ -13,6 +14,7 @@ Rules:
 - 修改代码后，运行 `node "/Volumes/1T_M2/Downloads/code/codesense_skill/skill.js" update` 增量更新（如已安装 hook 则自动触发）
 - 搜索返回的是 chunk 级结果，仍需读取源文件确认完整上下文
 <!-- codesense-end -->
+
 
 ## 项目简介
 
@@ -129,23 +131,35 @@ scripts/
 
 ## 变更记录
 
-### 2026-04-28 全局化改造
+### 2026-04-28 仪表板与图谱修复
 
-**目标**：将项目本地索引模式改为全局管理模式（`docs/update.md`）
+**Dashboard HTML** (`src/html/index.ts`)：
+1. **布局重构** — 搜索框从左侧 sidebar 移至右侧 toolbar，sidebar 只保留项目列表 + 符号详情
+2. **语义搜索修复** — 后端返回字段 `file`，前端曾误用 `filePath`；已统一字段名
+3. **符号详情修复** — `buildFileGraph()` 缺少 `fullPath`/`funcCount`/`functions` 字段，点击节点显示 undefined
+
+**知识图谱** (`src/graph.ts`)：
+1. **路径格式统一** — import 边的 `from`/`to` 节点 ID 混用绝对路径和相对路径，统一为相对路径（`nodeId(relPath, "__module__")`）
+2. **删除 `resolveImportPath`** — 改用 `path.relative(process.cwd(), resolved)` 生成相对路径
+3. 修复后数据：242 节点、289 边（66 import + 223 call），文件间关系正确显示
+
+**日志系统** (`src/logger.ts`)：
+- 新增文件日志，存储于 `~/.codesense/logs/YYYY-MM-DD.log`，JSON 格式，支持按项目/日期查询
+- API 端点：`/api/logs`、`/api/logs/dates`，Dashboard "查看日志"按钮触发
+
+**注意**：
+- `buildFileGraph()` 返回的 Cytoscape 节点必须包含 `fullPath`、`funcCount`、`functions` 字段
+- 修改 `src/html/index.ts` 后需 `node build.js` + 重启服务器才能生效
+- 搜索结果面板用 `position:absolute` 定位在 toolbar 下方，`main` 需要 `position:relative`
+
+### 2026-04-28 全局化改造
 
 **核心变更**：
 1. **新增 `src/global.ts`** — 全局目录管理（`~/.codesense/`、registry.json、项目注册/注销）
 2. **`install` → `init`** — 环境检查（Ollama + 模型）→ 创建全局目录 → 注册项目 → CLAUDE.md + git hook
-3. **索引路径迁移** — 从本地 `codesense-out/` 改为 `~/.codesense/projects/<name>/`，涉及 config.ts、indexer.ts、search.ts、update.ts、trace.ts、index.ts
-4. **新增 `list` 命令** — 列出所有已注册项目及索引状态
-5. **`search --project`** — 支持指定项目名或 `--project all` 跨项目搜索
-6. **`scripts/` 命令拆分** — 8 个命令注册文件，每个导出 `register(program)`，cli.ts 静态导入
-7. **`run.js` 改造** — 开发模式改为 esbuild 即时编译（原 require ts 方式不可用）
-8. **`build.js`** — entryPoints 从 `run.js` 改为 `src/cli.ts`
+3. **索引路径迁移** — 从本地 `codesense-out/` 改为 `~/.codesense/projects/<name>/`
+4. **新增 `list` 命令** / **`search --project`** / **`scripts/` 命令拆分**
+5. **`run.js` 改造** — esbuild 即时编译 / **`build.js`** — entryPoints 改为 `src/cli.ts`
 
-**踩坑与解决**：
-- esbuild 不支持动态 `require()` 路径 → cli.ts 改为静态 import 所有 scripts/
-- `run.js` 直接 require `.ts` 文件失败 → 改为 esbuild 即时编译到 tmp 文件再执行
-- `build.js` 的 entryPoints 曾指向 `run.js`（esbuild 包装器）导致 skill.js 卡住 → 改为 `src/cli.ts`
-- `OUTPUT_DIR` 常量删除后，trace.ts 仍引用旧常量和 getOutputDir → 一并迁移到 global.ts 的项目目录解析
+**踩坑**：esbuild 不支持动态 require → 静态 import；run.js require .ts 失败 → esbuild 即时编译；build.js entryPoints 指向 run.js 导致 skill.js 卡住 → 指向 src/cli.ts
 

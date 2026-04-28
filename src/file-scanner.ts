@@ -88,12 +88,23 @@ function matchGitignorePattern(relPath: string, pattern: string): boolean {
     return relPath === base || relPath.startsWith(base + "/");
   }
 
-  // 匹配路径前缀、路径中间段、或文件名
-  if (relPath === normalized || relPath.startsWith(normalized + "/")) return true;
-  const parts = relPath.split("/");
-  if (parts.includes(normalized)) return true;
-  if (parts[parts.length - 1] === normalized) return true;
+  // 纯文件名 = 匹配任意路径下的该文件
+  if (!p.includes("/")) {
+    return relPath === p || relPath.endsWith("/" + p);
+  }
 
+  return relPath.startsWith(p);
+}
+
+export function matchExcludePattern(relPath: string, patterns: string[]): boolean {
+  for (const pat of patterns) {
+    if (pat.includes("*")) {
+      const regex = globToRegex(pat);
+      if (regex.test(relPath) || regex.test(relPath.split("/").pop() || "")) return true;
+    } else {
+      if (relPath === pat || relPath.endsWith("/" + pat)) return true;
+    }
+  }
   return false;
 }
 
