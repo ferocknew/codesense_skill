@@ -94,12 +94,12 @@ export async function buildIndex(
     }
   }
   const mergedGraph = mergeDepGraphs(graphs);
-  saveDepGraph(path.join(outDir, "deps.json"), mergedGraph);
+  saveDepGraph(projectName, mergedGraph);
 
   // 9. 保存 manifest
   const filePaths = files.map((f) => f.filePath);
   const manifest = await buildManifest(filePaths);
-  saveManifest(path.join(outDir, "manifest.json"), manifest);
+  saveManifest(projectName, manifest);
 
   // 10. 保存配置
   const actualDimensions = vectors[0]?.length || dimensions;
@@ -111,7 +111,7 @@ export async function buildIndex(
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
-  saveConfig(path.join(outDir, "config.json"), config);
+  saveConfig(projectName, config);
 
   // 11. 注册项目
   registerProject(projectName, absDir);

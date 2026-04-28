@@ -1,7 +1,6 @@
-import * as fs from "fs";
-import * as path from "path";
 import { IndexConfig } from "./types";
 import { getProjectDir, ensureProjectDir, findProjectByDir, listProjects, getGlobalDir } from "./global";
+import { dbLoadConfig, dbSaveConfig, dbGetManifestCount, dbGetDepStats } from "./database";
 
 export function resolveDimensions(_chunkCount: number, strategy: string): number {
   switch (strategy) {
@@ -15,13 +14,12 @@ export function resolveDimensions(_chunkCount: number, strategy: string): number
   }
 }
 
-export function loadConfig(configPath: string): IndexConfig | null {
-  if (!fs.existsSync(configPath)) return null;
-  return JSON.parse(fs.readFileSync(configPath, "utf-8"));
+export function loadConfig(projectName: string): IndexConfig | null {
+  return dbLoadConfig(projectName);
 }
 
-export function saveConfig(configPath: string, config: IndexConfig): void {
-  fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf-8");
+export function saveConfig(projectName: string, config: IndexConfig): void {
+  dbSaveConfig(projectName, config);
 }
 
 export function getProjectOutputDir(projectName: string): string {
@@ -58,8 +56,7 @@ export async function showStatus(projectName?: string): Promise<void> {
   for (const p of projects) {
     console.log(`  ${p.name}`);
     console.log(`    路径: ${p.path}`);
-    const configPath = path.join(getProjectDir(p.name), "config.json");
-    const config = loadConfig(configPath);
+    const config = loadConfig(p.name);
     if (config) {
       console.log(`    模型: ${config.model}  维度: ${config.dimensions}  更新: ${config.updatedAt}`);
     } else {
@@ -69,9 +66,7 @@ export async function showStatus(projectName?: string): Promise<void> {
 }
 
 function showProjectStatus(projectName: string): void {
-  const outDir = getProjectDir(projectName);
-  const configPath = path.join(outDir, "config.json");
-  const config = loadConfig(configPath);
+  const config = loadConfig(projectName);
 
   if (!config) {
     console.log(`项目 "${projectName}" 未建索引。运行 \`codesense index <目录>\` 建立索引。`);
@@ -85,18 +80,10 @@ function showProjectStatus(projectName: string): void {
   console.log(`  创建时间: ${config.createdAt}`);
   console.log(`  更新时间: ${config.updatedAt}`);
 
-  const manifestPath = path.join(outDir, "manifest.json");
-  if (fs.existsSync(manifestPath)) {
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
-    console.log(`  文件数:   ${Object.keys(manifest).length}`);
-  }
+  const fileCount = dbGetManifestCount(projectName);
+  console.log(`  文件数:   ${fileCount}`);
 
-  const depsPath = path.join(outDir, "deps.json");
-  if (fs.existsSync(depsPath)) {
-    const deps = JSON.parse(fs.readFileSync(depsPath, "utf-8"));
-    const nodes = Object.keys(deps.nodes || {}).length;
-    const edges = (deps.edges || []).length;
-    console.log(`  依赖节点: ${nodes}`);
-    console.log(`  依赖边:   ${edges}`);
-  }
+  const { nodeCount, edgeCount } = dbGetDepStats(projectName);
+  console.log(`  依赖节点: ${nodeCount}`);
+  console.log(`  依赖边:   ${edgeCount}`);
 }

@@ -1,8 +1,7 @@
-import * as fs from "fs";
-import * as path from "path";
 import { DepGraph, TraceNode } from "./types";
 import { loadDepGraph } from "./graph";
-import { findProjectByDir, resolveProjectName, getProjectDir } from "./global";
+import { findProjectByDir, resolveProjectName } from "./global";
+import { dbLoadConfig } from "./database";
 
 export interface TraceOptions {
   depth?: number;
@@ -11,14 +10,14 @@ export interface TraceOptions {
   baseDir?: string;
 }
 
-// 查找项目索引目录
-function resolveProjectDir(startDir: string): string | null {
+// 查找项目名
+function resolveProject(startDir: string): string | null {
   const entry = findProjectByDir(startDir);
-  if (entry) return getProjectDir(entry.name);
+  if (entry) return entry.name;
 
   const projectName = resolveProjectName(startDir);
-  const projectDir = getProjectDir(projectName);
-  if (fs.existsSync(path.join(projectDir, "deps.json"))) return projectDir;
+  const config = dbLoadConfig(projectName);
+  if (config) return projectName;
 
   return null;
 }
@@ -175,14 +174,13 @@ export async function trace(symbol: string, options: TraceOptions = {}): Promise
   const direction = options.direction || "both";
   const format = options.format || "tree";
 
-  const projectDir = resolveProjectDir(options.baseDir || ".");
-  if (!projectDir) {
+  const projectName = resolveProject(options.baseDir || ".");
+  if (!projectName) {
     console.error("未找到索引。运行 `codesense index <目录>` 建立索引。");
     process.exit(1);
   }
 
-  const depsPath = path.join(projectDir, "deps.json");
-  const graph = loadDepGraph(depsPath);
+  const graph = loadDepGraph(projectName);
 
   // 查找匹配节点
   const matches = findMatchingNodes(graph, symbol);

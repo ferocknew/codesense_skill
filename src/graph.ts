@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import { DepGraph, DepNode } from "./types";
+import { DepGraph } from "./types";
+import { dbLoadDepGraph, dbSaveDepGraph, dbRemoveFileFromGraph } from "./database";
 
 export function emptyDepGraph(): DepGraph {
   return { nodes: {}, edges: [] };
@@ -148,33 +148,14 @@ export function mergeDepGraphs(graphs: DepGraph[]): DepGraph {
   return merged;
 }
 
-export function saveDepGraph(path: string, graph: DepGraph): void {
-  fs.writeFileSync(path, JSON.stringify(graph, null, 2), "utf-8");
+export function saveDepGraph(projectName: string, graph: DepGraph): void {
+  dbSaveDepGraph(projectName, graph);
 }
 
-export function loadDepGraph(path: string): DepGraph {
-  if (!fs.existsSync(path)) return emptyDepGraph();
-  return JSON.parse(fs.readFileSync(path, "utf-8"));
+export function loadDepGraph(projectName: string): DepGraph {
+  return dbLoadDepGraph(projectName);
 }
 
-export function removeFileFromGraph(graph: DepGraph, filePath: string): DepGraph {
-  const nodesToRemove = new Set<string>();
-  for (const [id, node] of Object.entries(graph.nodes)) {
-    if (node.file === filePath) {
-      nodesToRemove.add(id);
-    }
-  }
-
-  const newNodes: Record<string, DepNode> = {};
-  for (const [id, node] of Object.entries(graph.nodes)) {
-    if (!nodesToRemove.has(id)) {
-      newNodes[id] = node;
-    }
-  }
-
-  const newEdges = graph.edges.filter(
-    (e) => !nodesToRemove.has(e.from) && !nodesToRemove.has(e.to)
-  );
-
-  return { nodes: newNodes, edges: newEdges };
+export function removeFileFromGraph(projectName: string, filePath: string): void {
+  dbRemoveFileFromGraph(projectName, filePath);
 }

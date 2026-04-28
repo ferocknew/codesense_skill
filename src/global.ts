@@ -1,6 +1,16 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import {
+  dbLoadRegistry,
+  dbSaveRegistry,
+  dbRegisterProject,
+  dbUnregisterProject,
+  dbFindProjectByDir,
+  dbListProjects,
+  dbLoadGlobalConfig,
+  dbSaveGlobalConfig,
+} from "./database";
 
 export interface RegistryEntry {
   name: string;
@@ -40,33 +50,20 @@ export function ensureGlobalDir(): string {
 }
 
 export function loadRegistry(): Registry {
-  const filePath = path.join(getGlobalDir(), "registry.json");
-  if (!fs.existsSync(filePath)) return {};
-  return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+  return dbLoadRegistry();
 }
 
 export function saveRegistry(registry: Registry): void {
-  const dir = ensureGlobalDir();
-  fs.writeFileSync(
-    path.join(dir, "registry.json"),
-    JSON.stringify(registry, null, 2),
-    "utf-8"
-  );
+  dbSaveRegistry(registry);
 }
 
 export function loadGlobalConfig(): GlobalConfig {
-  const filePath = path.join(getGlobalDir(), "global-config.json");
-  if (!fs.existsSync(filePath)) return { ...DEFAULT_GLOBAL_CONFIG };
-  return { ...DEFAULT_GLOBAL_CONFIG, ...JSON.parse(fs.readFileSync(filePath, "utf-8")) };
+  const config = dbLoadGlobalConfig();
+  return { ...DEFAULT_GLOBAL_CONFIG, ...config };
 }
 
 export function saveGlobalConfig(config: GlobalConfig): void {
-  const dir = ensureGlobalDir();
-  fs.writeFileSync(
-    path.join(dir, "global-config.json"),
-    JSON.stringify(config, null, 2),
-    "utf-8"
-  );
+  dbSaveGlobalConfig(config);
 }
 
 export function resolveProjectName(sourceDir: string): string {
@@ -74,23 +71,11 @@ export function resolveProjectName(sourceDir: string): string {
 }
 
 export function registerProject(name: string, sourcePath: string): void {
-  const registry = loadRegistry();
-  if (!registry[name]) {
-    registry[name] = {
-      name,
-      path: path.resolve(sourcePath),
-      createdAt: new Date().toISOString(),
-    };
-    saveRegistry(registry);
-  }
+  dbRegisterProject(name, sourcePath);
 }
 
 export function unregisterProject(name: string): void {
-  const registry = loadRegistry();
-  if (registry[name]) {
-    delete registry[name];
-    saveRegistry(registry);
-  }
+  dbUnregisterProject(name);
 }
 
 export function getProjectDir(name: string): string {
@@ -106,15 +91,9 @@ export function ensureProjectDir(name: string): string {
 }
 
 export function findProjectByDir(sourceDir: string): RegistryEntry | null {
-  const registry = loadRegistry();
-  const absPath = path.resolve(sourceDir);
-  for (const entry of Object.values(registry)) {
-    if (entry.path === absPath) return entry;
-  }
-  return null;
+  return dbFindProjectByDir(sourceDir);
 }
 
 export function listProjects(): RegistryEntry[] {
-  const registry = loadRegistry();
-  return Object.values(registry);
+  return dbListProjects();
 }

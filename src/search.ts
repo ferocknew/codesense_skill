@@ -33,8 +33,7 @@ async function searchSingleProject(
   const threshold = options.threshold ?? DEFAULT_THRESHOLD;
   const outDir = getProjectDir(projectName);
 
-  const configPath = path.join(outDir, "config.json");
-  const config = loadConfig(configPath);
+  const config = loadConfig(projectName);
   if (!config) return [];
 
   const embedder = new OllamaEmbedder({ dimensions: config.dimensions });

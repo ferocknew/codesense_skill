@@ -5,29 +5,154 @@ import { OllamaEmbedder } from "./embedder";
 import { chunkFile, buildEmbeddingInput } from "./chunker";
 import { scanDirectory } from "./file-scanner";
 import { addToTable, deleteFromTable } from "./index";
-import { buildManifest, loadManifest, saveManifest, diffManifests } from "./manifest";
+import { buildManifest, saveManifest, diffManifests } from "./manifest";
 import { loadConfig, saveConfig } from "./config";
-import { extractDeps, loadDepGraph, saveDepGraph, removeFileFromGraph, mergeDepGraphs } from "./graph";
-import { findProjectByDir, resolveProjectName, getProjectDir, ensureProjectDir } from "./global";
+import { extractDeps, removeFileFromGraph } from "./graph";
+import { findProjectByDir, resolveProjectName, ensureProjectDir } from "./global";
+import { dbSaveManifestIncremental } from "./database";
+import { EXT_TO_LANGUAGE } from "./types";
 
 function resolveProject(dir: string): { projectName: string; indexDir: string } | null {
-  // 优先从 registry 查找
   const entry = findProjectByDir(dir);
   if (entry) {
     return { projectName: entry.name, indexDir: entry.path };
   }
 
-  // 回退到目录名
   const projectName = resolveProjectName(dir);
-  const projectDir = getProjectDir(projectName);
-  if (fs.existsSync(path.join(projectDir, "config.json"))) {
+  const config = loadConfig(projectName);
+  if (config) {
     return { projectName, indexDir: path.resolve(dir) };
   }
 
   return null;
 }
 
-export async function updateIndex(
+// 根据 --files 参数直接处理指定文件（跳过全目录扫描）
+async function updateByFiles(
+  projectName: string,
+  indexDir: string,
+  changedFiles: string[],
+  options: { quiet?: boolean; exitOnError?: boolean } = {}
+): Promise<void> {
+  const quiet = options.quiet || false;
+  const exitOnError = options.exitOnError !== false;
+  const outDir = ensureProjectDir(projectName);
+  const config = loadConfig(projectName);
+  if (!config) {
+    if (!quiet) console.error("索引配置损坏。请重新运行 `codesense index`。");
+    if (exitOnError) process.exit(1);
+    throw new Error("索引配置损坏。");
+  }
+
+  if (!quiet) console.log(`处理 ${changedFiles.length} 个文件...`);
+
+  const dbPath = path.join(outDir, "index.lance");
+  const embedder = new OllamaEmbedder({ dimensions: config.dimensions });
+  await embedder.ensureModel();
+
+  const toDelete: string[] = [];
+  const toUpsert: Record<string, string> = {};
+  const processable: { absPath: string; relPath: string; language: string }[] = [];
+
+  for (const file of changedFiles) {
+    const absPath = path.resolve(indexDir, file);
+    const ext = path.extname(file);
+
+    if (!fs.existsSync(absPath)) {
+      // 文件被删除
+      toDelete.push(file);
+    } else if (EXT_TO_LANGUAGE[ext]) {
+      // 文件存在且是支持的类型
+      toUpsert[absPath] = "committed"; // 占位，后面会更新
+      processable.push({ absPath, relPath: file, language: EXT_TO_LANGUAGE[ext] });
+    }
+  }
+
+  // 删除已移除文件的索引
+  if (toDelete.length > 0) {
+    if (!quiet) process.stderr.write(`删除 ${toDelete.length} 个文件...\n`);
+    await deleteFromTable(dbPath, toDelete);
+    for (const fp of toDelete) {
+      removeFileFromGraph(projectName, fp);
+    }
+  }
+
+  // 删除修改文件的旧 chunk，再重新处理
+  if (processable.length > 0) {
+    const relPaths = processable.map((f) => f.relPath);
+    await deleteFromTable(dbPath, relPaths);
+    for (const fp of relPaths) {
+      removeFileFromGraph(projectName, fp);
+    }
+
+    // 分块 + embed
+    const allChunks: CodeChunk[] = [];
+    for (const { absPath, relPath, language } of processable) {
+      try {
+        const content = fs.readFileSync(absPath, "utf-8");
+        const chunks = chunkFile(relPath, content, language);
+        allChunks.push(...chunks);
+      } catch (e: any) {
+        if (!quiet) process.stderr.write(`  跳过 ${relPath}: ${e.message}\n`);
+      }
+    }
+
+    if (allChunks.length > 0) {
+      if (!quiet) process.stderr.write(`处理 ${allChunks.length} 个代码块...\n`);
+      const inputs = allChunks.map((c) => buildEmbeddingInput(c));
+      const vectors = await embedder.embed(inputs);
+
+      const records = allChunks.map((chunk, i) => ({
+        vector: vectors[i],
+        text: chunk.text,
+        symbol: chunk.symbol,
+        chunkType: chunk.chunkType,
+        filePath: chunk.filePath,
+        lineStart: chunk.lineStart,
+        lineEnd: chunk.lineEnd,
+        language: chunk.language,
+        textHash: chunk.textHash,
+        context: chunk.context,
+      }));
+
+      await addToTable(dbPath, records);
+    }
+
+    // 更新依赖图
+    for (const { absPath, relPath, language } of processable) {
+      try {
+        const content = fs.readFileSync(absPath, "utf-8");
+        const fileGraph = extractDeps(relPath, content, language);
+        const { dbMergeDepGraph } = require("./database");
+        dbMergeDepGraph(projectName, fileGraph);
+      } catch {
+        // 跳过
+      }
+    }
+  }
+
+  // 增量更新 manifest（只更新本次涉及的文件）
+  const manifestUpsert: Record<string, string> = {};
+  for (const { absPath } of processable) {
+    try {
+      const hash = require("crypto").createHash("sha256").update(fs.readFileSync(absPath)).digest("hex");
+      manifestUpsert[absPath] = hash;
+    } catch {}
+  }
+  if (Object.keys(manifestUpsert).length > 0 || toDelete.length > 0) {
+    dbSaveManifestIncremental(projectName, manifestUpsert, toDelete);
+  }
+
+  config.updatedAt = new Date().toISOString();
+  saveConfig(projectName, config);
+
+  if (!quiet) {
+    console.log(`更新完成！处理 ${changedFiles.length} 个文件。`);
+  }
+}
+
+// 全量 manifest diff 模式（原有逻辑）
+async function updateByManifest(
   dir: string,
   options: { quiet?: boolean; exitOnError?: boolean } = {}
 ): Promise<void> {
@@ -42,26 +167,18 @@ export async function updateIndex(
 
   const { projectName, indexDir } = resolved;
   const outDir = ensureProjectDir(projectName);
-  const configPath = path.join(outDir, "config.json");
-  const config = loadConfig(configPath);
+  const config = loadConfig(projectName);
   if (!config) {
     if (!quiet) console.error("索引配置损坏。请重新运行 `codesense index`。");
     if (exitOnError) process.exit(1);
     throw new Error("索引配置损坏。请重新运行 `codesense index`。");
   }
 
-  // 加载旧 manifest
-  const oldManifest = loadManifest(path.join(outDir, "manifest.json"));
-
-  // 扫描当前文件
   const files = scanDirectory(indexDir);
   const filePaths = files.map((f) => f.filePath);
-
-  // 构建新 manifest
   const newManifest = await buildManifest(filePaths);
 
-  // 对比差异
-  const diff = diffManifests(oldManifest, newManifest);
+  const diff = diffManifests(projectName, newManifest);
   const totalChanges = diff.added.length + diff.modified.length + diff.deleted.length;
 
   if (totalChanges === 0) {
@@ -75,7 +192,7 @@ export async function updateIndex(
 
   const dbPath = path.join(outDir, "index.lance");
 
-  // 处理删除的文件
+  // 处理删除
   const deletedRelative = diff.deleted.map((fp) => {
     const f = files.find((f) => f.filePath === fp);
     return f ? f.relativePath : path.relative(indexDir, fp);
@@ -83,23 +200,17 @@ export async function updateIndex(
   if (diff.deleted.length > 0) {
     if (!quiet) process.stderr.write(`删除 ${diff.deleted.length} 个文件的索引...\n`);
     await deleteFromTable(dbPath, deletedRelative);
-
-    let depGraph = loadDepGraph(path.join(outDir, "deps.json"));
     for (const fp of deletedRelative) {
-      depGraph = removeFileFromGraph(depGraph, fp);
+      removeFileFromGraph(projectName, fp);
     }
-    saveDepGraph(path.join(outDir, "deps.json"), depGraph);
   }
 
-  // 处理修改和新增的文件
+  // 处理修改和新增
   const changedFiles = [...diff.added, ...diff.modified];
   if (changedFiles.length > 0) {
     const embedder = new OllamaEmbedder({ dimensions: config.dimensions });
     await embedder.ensureModel();
 
-    let depGraph = loadDepGraph(path.join(outDir, "deps.json"));
-
-    // 先删除修改文件的旧 chunk
     if (diff.modified.length > 0) {
       const modifiedRelative = diff.modified.map((fp) => {
         const f = files.find((f) => f.filePath === fp);
@@ -107,11 +218,10 @@ export async function updateIndex(
       });
       await deleteFromTable(dbPath, modifiedRelative);
       for (const fp of modifiedRelative) {
-        depGraph = removeFileFromGraph(depGraph, fp);
+        removeFileFromGraph(projectName, fp);
       }
     }
 
-    // 分块 + embed + 写入
     const allChunks: CodeChunk[] = [];
     for (const fp of changedFiles) {
       const file = files.find((f) => f.filePath === fp);
@@ -145,29 +255,44 @@ export async function updateIndex(
 
       await addToTable(dbPath, records);
 
-      // 更新依赖图
       for (const fp of changedFiles) {
         const file = files.find((f) => f.filePath === fp);
         if (!file) continue;
         try {
           const content = fs.readFileSync(fp, "utf-8");
           const fileGraph = extractDeps(file.relativePath, content, file.language);
-          depGraph = mergeDepGraphs([depGraph, fileGraph]);
-        } catch {
-          // 跳过
-        }
+          const { dbMergeDepGraph } = require("./database");
+          dbMergeDepGraph(projectName, fileGraph);
+        } catch {}
       }
     }
-
-    saveDepGraph(path.join(outDir, "deps.json"), depGraph);
   }
 
-  // 更新 manifest 和 config
-  saveManifest(path.join(outDir, "manifest.json"), newManifest);
+  saveManifest(projectName, newManifest);
   config.updatedAt = new Date().toISOString();
-  saveConfig(configPath, config);
+  saveConfig(projectName, config);
 
   if (!quiet) {
     console.log(`增量更新完成！变更 ${totalChanges} 个文件。`);
   }
+}
+
+export async function updateIndex(
+  dir: string,
+  options: { quiet?: boolean; exitOnError?: boolean; files?: string[] } = {}
+): Promise<void> {
+  // --files 模式：直接处理指定文件
+  if (options.files && options.files.length > 0) {
+    const resolved = resolveProject(dir);
+    if (!resolved) {
+      if (!options.quiet) console.error("未找到索引。运行 `codesense index <目录>` 建立索引。");
+      if (options.exitOnError !== false) process.exit(1);
+      throw new Error("未找到索引。");
+    }
+    await updateByFiles(resolved.projectName, resolved.indexDir, options.files, options);
+    return;
+  }
+
+  // 默认模式：全量 manifest diff
+  await updateByManifest(dir, options);
 }

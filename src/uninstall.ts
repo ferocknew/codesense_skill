@@ -1,17 +1,18 @@
 import * as fs from "fs";
 import * as path from "path";
 import { CLAUDE_MD_MARKER, CLAUDE_MD_END_MARKER, HOOK_MARKER } from "./install";
-import { unregisterProject, resolveProjectName, getProjectDir } from "./global";
+import { resolveProjectName, getProjectDir } from "./global";
+import { dbDeleteProjectData } from "./database";
 
 export async function uninstall(projectDir?: string): Promise<void> {
   const absDir = path.resolve(projectDir || ".");
   const projectName = resolveProjectName(absDir);
 
-  // Step 1: 从 registry 移除项目
-  unregisterProject(projectName);
-  console.log(`✓ 项目 "${projectName}" 已从 registry 移除`);
+  // Step 1: 从 registry 移除项目（CASCADE 删除所有项目数据）
+  dbDeleteProjectData(projectName);
+  console.log(`✓ 项目 "${projectName}" 数据已从数据库移除`);
 
-  // Step 2: 清理索引数据
+  // Step 2: 清理 LanceDB 索引目录
   const projectDataDir = getProjectDir(projectName);
   if (fs.existsSync(projectDataDir)) {
     fs.rmSync(projectDataDir, { recursive: true, force: true });

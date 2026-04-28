@@ -49,6 +49,7 @@ const external = [
   "tree-sitter-c",
   "tree-sitter-cpp",
   "@lancedb/lancedb",
+  "better-sqlite3",
 ];
 
 try {

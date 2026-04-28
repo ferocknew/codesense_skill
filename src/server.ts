@@ -18,6 +18,7 @@ import { loadConfig } from "./config";
 import { getTableStats } from "./index";
 import { search as searchCode } from "./search";
 import { loadDepGraph } from "./graph";
+import { closeDb, dbGetDepStats } from "./database";
 
 export interface ServerOptions {
   port: number;
@@ -58,6 +59,7 @@ export async function startServer(options: ServerOptions): Promise<void> {
       } catch {}
     }
     sseClients.clear();
+    closeDb();
     server.close(() => {
       console.log("服务器已关闭");
       process.exit(0);
@@ -150,7 +152,7 @@ async function serveProjects(res: http.ServerResponse): Promise<void> {
   const results = await Promise.all(
     projects.map(async (p) => {
       const projectDir = getProjectDir(p.name);
-      const config = loadConfig(path.join(projectDir, "config.json"));
+      const config = loadConfig(p.name);
       const stats = await getTableStats(path.join(projectDir, "index.lance"));
       return {
         name: p.name,
@@ -176,17 +178,9 @@ async function serveProjectDetail(
     sendJSON(res, 404, { ok: false, error: `项目 "${name}" 未找到` });
     return;
   }
-  const config = loadConfig(path.join(projectDir, "config.json"));
+  const config = loadConfig(name);
   const stats = await getTableStats(path.join(projectDir, "index.lance"));
-  let depCount = 0;
-  let edgeCount = 0;
-  try {
-    const deps = JSON.parse(
-      fs.readFileSync(path.join(projectDir, "deps.json"), "utf-8")
-    );
-    depCount = Object.keys(deps.nodes || {}).length;
-    edgeCount = (deps.edges || []).length;
-  } catch {}
+  const { nodeCount: depCount, edgeCount } = dbGetDepStats(name);
 
   sendJSON(res, 200, {
     ok: true,
@@ -204,13 +198,12 @@ async function serveGraphData(
   res: http.ServerResponse,
   name: string
 ): Promise<void> {
-  const projectDir = getProjectDir(name);
-  const depsPath = path.join(projectDir, "deps.json");
-  if (!fs.existsSync(depsPath)) {
+  const config = loadConfig(name);
+  if (!config) {
     sendJSON(res, 404, { ok: false, error: `项目 "${name}" 无依赖图数据` });
     return;
   }
-  const deps = loadDepGraph(depsPath);
+  const deps = loadDepGraph(name);
   sendJSON(res, 200, { ok: true, data: deps });
 }
 
