@@ -8,7 +8,7 @@ export function resolveDimensions(_chunkCount: number, strategy: string): number
     case "quality":
       return 1024;
     case "performance":
-      return 512;
+      return 1024;
     case "auto":
     default:
       return 1024;

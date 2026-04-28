@@ -5,3 +5,4 @@ skill.js
 *.js.map
 .DS_Store
 /docs/
+/.claude/
