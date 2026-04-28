@@ -59,6 +59,7 @@ export interface SearchResult {
   lineEnd: number;
   text: string;
   context: string;
+  language: string;
 }
 
 export interface TraceResult {

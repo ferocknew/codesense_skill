@@ -13,6 +13,7 @@ import { extractDeps, removeFileFromGraph } from "./graph";
 import { findProjectByDir, resolveProjectName, ensureProjectDir } from "./global";
 import { dbSaveManifestIncremental } from "./database";
 import { appendLog } from "./logger";
+import { getProjectDir } from "./global";
 
 function resolveProject(dir: string): { projectName: string; indexDir: string } | null {
   const entry = findProjectByDir(dir);
@@ -27,6 +28,29 @@ function resolveProject(dir: string): { projectName: string; indexDir: string } 
   }
 
   return null;
+}
+
+// 获取/保存上次处理的 commit hash（文件存储，避免 schema 变更）
+function getLastCommitHash(projectName: string): string | null {
+  try {
+    const f = path.join(getProjectDir(projectName), ".last-commit");
+    return fs.existsSync(f) ? fs.readFileSync(f, "utf-8").trim() : null;
+  } catch { return null; }
+}
+
+function saveLastCommitHash(projectName: string, hash: string): void {
+  try {
+    fs.writeFileSync(path.join(getProjectDir(projectName), ".last-commit"), hash, "utf-8");
+  } catch {}
+}
+
+// 获取当前 HEAD commit hash
+function getGitHeadHash(indexDir: string): string | null {
+  try {
+    return execSync("git rev-parse HEAD", { cwd: indexDir, encoding: "utf-8", timeout: 5000 }).trim();
+  } catch {
+    return null;
+  }
 }
 
 // 尝试用 git 获取变更文件列表
@@ -233,12 +257,21 @@ export async function updateIndex(
   const gitFiles = getGitChangedFiles(indexDir);
   const startTime = Date.now();
   if (gitFiles !== null) {
+    // 幂等检查：如果上次已处理过这个 commit，跳过
+    const headHash = getGitHeadHash(indexDir);
+    const lastHash = getLastCommitHash(projectName);
+    if (headHash && lastHash === headHash) {
+      if (!quiet) console.log("索引已是最新。");
+      return;
+    }
+
     if (gitFiles.length === 0) {
       if (!quiet) console.log("无变更文件。");
       return;
     }
     try {
       await updateByFiles(projectName, indexDir, gitFiles, options);
+      if (headHash) saveLastCommitHash(projectName, headHash);
       appendLog({ time: new Date().toISOString(), project: projectName, action: "update", status: "completed", files: gitFiles.length, durationMs: Date.now() - startTime });
     } catch (e: any) {
       appendLog({ time: new Date().toISOString(), project: projectName, action: "update", status: "failed", error: e.message, durationMs: Date.now() - startTime });

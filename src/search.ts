@@ -69,9 +69,14 @@ async function searchSingleProject(
       lineEnd: r.lineEnd || 0,
       text: r.text || "",
       context: r.context || "",
+      language: r.language || "",
     }))
     .filter((r: SearchResult) => r.score >= threshold)
-    .filter((r: SearchResult) => !matchExcludePattern(r.file, excludeFiles));
+    .filter((r: SearchResult) => !matchExcludePattern(r.file, excludeFiles))
+    .filter((r: SearchResult, i: number, arr: SearchResult[]) => {
+      const key = r.file + ":" + r.lineStart + ":" + r.symbol;
+      return arr.findIndex((x) => x.file + ":" + x.lineStart + ":" + x.symbol === key) === i;
+    });
 }
 
 export async function search(query: string, options: SearchOptions = {}): Promise<SearchResult[]> {
