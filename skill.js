@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// codesense - 本地语义代码搜索 v260429.164126
+// codesense - 本地语义代码搜索 v260429.165025
 
 "use strict";
 var __create = Object.create;
@@ -6288,6 +6288,16 @@ document.getElementById("logDateFilter").addEventListener("change",loadLogs);
 document.getElementById("logActionFilter").addEventListener("change",loadLogs);
 loadLogDates();
 
+// \u6062\u590D\u8FDB\u884C\u4E2D\u7684\u7D22\u5F15\u72B6\u6001\uFF08\u9875\u9762\u5237\u65B0\u540E\u8FDB\u5EA6\u6761\u4E0D\u4E22\u5931\uFF09
+fetch("/api/status").then(function(r){return r.json()}).then(function(res){
+  if(!res.ok||!res.data||!res.data.projects)return;
+  res.data.projects.forEach(function(p){
+    if(p.status==="indexing"){
+      showBar(p.name);
+    }
+  });
+});
+
 // SSE
 var es=new EventSource("/api/events");
 es.addEventListener("project-added",function(e){
@@ -7567,7 +7577,7 @@ function register9(program3) {
 }
 
 // src/cli.ts
-var VERSION = true ? "260429.164126" : "0.1.0-dev";
+var VERSION = true ? "260429.165025" : "0.1.0-dev";
 var program2 = new Command();
 program2.name("codesense").description("\u672C\u5730\u8BED\u4E49\u4EE3\u7801\u641C\u7D22 - \u901A\u8FC7\u5411\u91CF\u7D22\u5F15\u5B9A\u4F4D\u4EE3\u7801\u7247\u6BB5\uFF0C\u652F\u6301 AST \u4F9D\u8D56\u8FFD\u8E2A").version(VERSION);
 register(program2);

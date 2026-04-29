@@ -12,6 +12,16 @@ document.getElementById("logDateFilter").addEventListener("change",loadLogs);
 document.getElementById("logActionFilter").addEventListener("change",loadLogs);
 loadLogDates();
 
+// 恢复进行中的索引状态（页面刷新后进度条不丢失）
+fetch("/api/status").then(function(r){return r.json()}).then(function(res){
+  if(!res.ok||!res.data||!res.data.projects)return;
+  res.data.projects.forEach(function(p){
+    if(p.status==="indexing"){
+      showBar(p.name);
+    }
+  });
+});
+
 // SSE
 var es=new EventSource("/api/events");
 es.addEventListener("project-added",function(e){
