@@ -55,7 +55,7 @@ function findPackageManager(): { cmd: string; name: string } {
 }
 
 function installDependencies(): void {
-  const skillDir = path.resolve(__dirname, "..");
+  const skillDir = __dirname;
   const nodeModules = path.join(skillDir, "node_modules");
 
   if (fs.existsSync(nodeModules)) {
