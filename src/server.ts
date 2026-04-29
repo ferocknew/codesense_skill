@@ -70,9 +70,6 @@ export async function startServer(options: ServerOptions): Promise<void> {
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
 
-  // 定期检查新注册项目（每 30s）
-  setInterval(() => refreshProjects(state), 30_000);
-
   server.listen(options.port, () => {
     console.log(`codesense server 已启动`);
     console.log(`  地址:     http://localhost:${options.port}`);
@@ -89,14 +86,69 @@ export async function startServer(options: ServerOptions): Promise<void> {
   });
 }
 
-function refreshProjects(state: ServerState): void {
-  const projects = listProjects();
-  for (const p of projects) {
-    if (!state.projects[p.name]) {
-      initProjectState(state, p.name, p.path);
-      broadcastSSE("project-added", { name: p.name, path: p.path, status: "idle" });
+function handleNotify(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+  state: ServerState
+): void {
+  let body = "";
+  req.on("data", (chunk: Buffer) => { body += chunk.toString(); });
+  req.on("end", () => {
+    try {
+      const { event, data } = JSON.parse(body) as { event: string; data: Record<string, unknown> };
+      const name = data.name as string | undefined;
+      const ts = new Date().toLocaleTimeString();
+      console.log(`[${ts}] notify: ${event}${name ? " " + name : ""}`);
+
+      switch (event) {
+        case "project-registered":
+          if (name) {
+            initProjectState(state, name, data.path as string || "");
+            broadcastSSE("project-added", { name, path: data.path || "", status: "idle" });
+          }
+          break;
+        case "project-unregistered":
+          if (name) {
+            delete state.projects[name];
+            broadcastSSE("project-removed", { name });
+          }
+          break;
+        case "index-started":
+        case "update-started":
+          if (name) {
+            updateProjectState(state, name, { status: "indexing", error: null });
+            broadcastSSE("index-progress", { type: "state", project: name, status: "indexing" });
+          }
+          break;
+        case "index-progress":
+        case "update-progress":
+          broadcastSSE("index-progress", { type: "progress", ...data });
+          break;
+        case "index-completed":
+        case "update-completed":
+          if (name) {
+            updateProjectState(state, name, {
+              status: "completed",
+              lastIndexAt: new Date().toISOString(),
+              lastDurationMs: (data.durationMs as number) || null,
+              error: null,
+            });
+            broadcastSSE("index-progress", { type: "state", project: name, ...state.projects[name] });
+          }
+          break;
+        case "index-failed":
+        case "update-failed":
+          if (name) {
+            updateProjectState(state, name, { status: "failed", error: data.error as string || "unknown" });
+            broadcastSSE("index-progress", { type: "state", project: name, ...state.projects[name] });
+          }
+          break;
+      }
+      sendJSON(res, 200, { ok: true });
+    } catch {
+      sendJSON(res, 400, { ok: false, error: "Invalid JSON" });
     }
-  }
+  });
 }
 
 async function handleRequest(
@@ -144,6 +196,8 @@ async function handleRequest(
       serveLogDates(res);
     } else if (pathname === "/api/events" && req.method === "GET") {
       handleSSE(req, res);
+    } else if (pathname === "/api/notify" && req.method === "POST") {
+      handleNotify(req, res, state);
     } else {
       sendJSON(res, 404, { ok: false, error: "Not Found" });
     }

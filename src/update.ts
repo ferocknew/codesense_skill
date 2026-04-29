@@ -74,7 +74,10 @@ async function updateByFiles(
   projectName: string,
   indexDir: string,
   changedFiles: string[],
-  options: { quiet?: boolean; exitOnError?: boolean } = {}
+  options: {
+    quiet?: boolean; exitOnError?: boolean;
+    onProgress?: (phase: string, current: number, total: number) => void;
+  } = {}
 ): Promise<void> {
   const quiet = options.quiet || false;
   const outDir = ensureProjectDir(projectName);
@@ -138,7 +141,9 @@ async function updateByFiles(
     if (allChunks.length > 0) {
       if (!quiet) process.stderr.write(`处理 ${allChunks.length} 个代码块...\n`);
       const inputs = allChunks.map((c) => buildEmbeddingInput(c));
-      const vectors = await embedder.embed(inputs);
+      const vectors = await embedder.embed(inputs, (current, total) => {
+        options.onProgress?.("embedding", current, total);
+      });
 
       const records = allChunks.map((chunk, i) => ({
         vector: vectors[i],
@@ -241,7 +246,11 @@ async function updateByManifest(
 
 export async function updateIndex(
   dir: string,
-  options: { quiet?: boolean; exitOnError?: boolean } = {}
+  options: {
+    quiet?: boolean;
+    exitOnError?: boolean;
+    onProgress?: (phase: string, current: number, total: number) => void;
+  } = {}
 ): Promise<void> {
   const quiet = options.quiet || false;
   const resolved = resolveProject(dir);

@@ -199,6 +199,11 @@ function onReady(){
       if(d.status==="indexing")showBar(d.project);
     }
   });
+  es.addEventListener("project-removed",function(e){
+    var d=JSON.parse(e.data);
+    var el=document.querySelector('[data-name="'+d.name+'"]');
+    if(el)el.remove();
+  });
 }
 
 var phaseLabels={scanning:"扫描文件",chunking:"代码分块",embedding:"生成向量",writing:"写入索引",deps:"提取依赖"};
