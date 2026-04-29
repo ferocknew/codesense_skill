@@ -50,7 +50,7 @@ src/
 ├── config.ts       # 索引配置管理（维度策略、config.json 读写、status 显示）
 ├── file-scanner.ts # 目录扫描（排除规则、扩展名→语言映射）
 ├── chunker.ts      # AST 感知分块（tree-sitter，核心模块，~500行）
-├── embedder.ts     # Ollama embedding 客户端（批量/单条、MRL 截断）
+├── embedder.ts     # Embedding 客户端（Ollama 批量/单条、MRL 截断、可配 batchSize/delay、createEmbedderFromGlobalConfig 工厂函数）
 ├── indexer.ts      # 索引构建主流程（协调 scanner→chunker→embedder→LanceDB）
 ├── index.ts        # LanceDB 表操作封装
 ├── graph.ts        # AST 依赖图构建（提取 imports/calls/implements 边）
@@ -66,17 +66,18 @@ src/
 └── html/
     ├── index.ts    # HTML 模板
     ├── css.ts      # CSS 样式导出
-    └── dashboard.ts # JavaScript 逻辑（ECharts 图谱）
+    └── dashboard.ts # JavaScript 逻辑（Sigma.js/Graphology 图谱 + 设置面板）
 
 scripts/
 ├── init.ts         # init 命令注册
 ├── list.ts         # list 命令注册（列出已注册项目）
-├── index_cmd.ts    # index 命令注册
+├── index_cmd.ts    # index 命令注册（自动转发 server 后台执行）
 ├── search.ts       # search 命令注册（含 --project 选项）
 ├── trace.ts        # trace 命令注册
-├── update.ts       # update 命令注册
+├── update.ts       # update 命令注册（自动转发 server 后台执行）
+├── forward.ts      # Server 检测与转发（ensureServer + forwardToServer）
 ├── status.ts       # status 命令注册
-├── server.ts       # server 命令注册（--port, --interval）
+├── server.ts       # server 命令注册（--port）
 └── uninstall.ts    # uninstall 命令注册
 ```
 
@@ -119,50 +120,36 @@ scripts/
 
 ## 变更记录
 
-### 2026-04-29 Dashboard 图谱重构（ECharts）
+### 2026-04-29 Embedding 设置 + 后台索引 + Bug 修复
 
-**前端技术栈替换** - Cytoscape.js → ECharts：
-- 使用 ECharts `graph` + `force` 力导向布局，类似 Neo4j/Obsidian 效果
-- 节点可拖拽、缩放、平移，点击高亮相邻节点
-- 移除 Cytoscape.js base64 内嵌依赖，改用 CDN 加载
-- 代码拆分：`src/html/` 下 `index.ts`（模板）、`css.ts`（样式）、`dashboard.ts`（逻辑）
+**Embedding 参数可配置**（降低低配机器 CPU 压力）：
+- `EmbeddingConfig` 新增 `batchSize`（默认 32）/ `batchDelay`（默认 0ms）字段
+- `GlobalConfig`（DB `global_config` 表）同步扩展，存取新 key
+- `embedder.ts` 新增 `createEmbedderFromGlobalConfig(dimensions)` 工厂函数，从 DB 读全局配置构建 embedder
+- `indexer.ts`/`update.ts`/`search.ts` 全部改用工厂函数，embedder 不再硬编码参数
+- Dashboard 设置面板：齿轮按钮 → 滑入面板 → Ollama URL / Model / Batch Size / Batch Delay
+- Server API：`GET/PUT /api/settings`（含参数校验：batchSize 1-100，batchDelay 0-10000ms）
 
-**修复问题**：
-- `buildFileGraph()` 缺少 `directories` 导致文件数 >50 时报错
-- 布局不稳定：启用位置缓存，重复点击保持相同布局
-- 节点聚集：提高斥力参数（30000-50000）、负重力（-0.5）推开节点
+**CLI index/update 后台化**：
+- `scripts/forward.ts`：`ensureServer()` 检测 server 运行状态，未运行则 detached spawn 启动
+- `forwardToServer()` 向 server POST 任务请求，CLI 秒返回
+- `index`/`update` 命令先尝试转发 server，不可达才本地执行兜底
+- 新增 `--local` 参数强制本地执行
 
-**注意**：
+**Bug 修复**：
+- `install.ts` 的 `installDependencies()` 路径错误：`path.resolve(__dirname, "..")` 在打包后多跳一级，改为 `__dirname`
+- 页面刷新后进度条消失：初始化时从 `/api/status` 恢复 `indexing` 状态的项目进度条
+- `skill.js` 已加入 git 跟踪（`.gitignore` 已移除排除）
+
+### 2026-04-29 Dashboard 图谱重构 + 实时化 + 全局化
+
+- **图谱重构**：Sigma.js + Graphology 替换 ECharts，力导向布局，节点可拖拽/缩放/点击详情
+- **实时通知**：`notifyServer()` CLI→Server HTTP POST，SSE 即时广播前端（零延迟）
+- **进度条**：indexer 5 阶段进度（scanning→chunking→embedding→writing→deps），项目卡片实时显示
+- **git hook**：异步 `nohup` 不阻塞 commit，husky 兼容
+- **全局化**：`~/.codesense/` 全局目录 + SQLite 元数据，`list`/`search --project`，manifest 增量更新
+- **AST 依赖**：tree-sitter 替换正则，跨文件 import 映射，搜索去重
 - 修改 `src/html/` 下文件需 `node build.js` + 重启服务器
-- ECharts CDN：`https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js`
-
-### 2026-04-29 Dashboard 实时化 + hook 修复 + 项目配置
-
-**CLI → 服务器实时通知** (`src/notify.ts` + `src/server.ts`)：
-- 新增 `notifyServer(event, data)` — CLI 通过 HTTP POST 通知运行中的服务器
-- 新增 `POST /api/notify` 端点 — 接收通知后通过 SSE 即时广播前端
-- 事件类型：`project-registered/unregistered`、`index|update-started/progress/completed/failed`
-- 移除 30 秒轮询 `refreshProjects`，改为 CLI 主动通知，零延迟
-
-**Dashboard 进度条**：
-- embedder.embed 添加 `onProgress(current, total)` 回调
-- indexer.buildIndex 5 阶段进度：scanning → chunking → embedding → writing → deps
-- 前端项目卡片底部实时显示进度条，SSE 监听更新
-
-**git hook 修复**：
-- 异步执行：`nohup node skill.js update --quiet &` 不阻塞 commit
-- husky 兼容：检测 `core.hooksPath`，在 `.husky/post-commit` 创建 hook
-- 项目级排除配置：init 生成 `.codesense/index.json`
-
-### 2026-04-28 Bug 修复 + 全局化改造
-
-- **跨文件追踪**：`buildTSImportMap()` 解析 import 构建跨文件映射，依赖边 218→351
-- **搜索去重**：按 `(file, lineStart, symbol)` 去重，修复 LanceDB 重复记录
-- **update 幂等**：记录 `lastCommitHash`，相同 commit 跳过
-- **全局化**：`~/.codesense/` 全局目录、SQLite 元数据、`list`/`search --project`
-- **AST 依赖**：tree-sitter 替换正则提取、`src/parser.ts` 共享解析器
-- **日志**：`src/logger.ts`，JSONL 文件日志，`/api/logs` 端点
-- **搜索黑名单**：默认排除 SKILL.md/README.md/CLAUDE.md
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
