@@ -78,7 +78,9 @@ src/
 ├── server-state.ts # 服务器内存状态（项目索引状态追踪）
 ├── auto-indexer.ts # 定时轮询自动索引（遍历注册项目，增量更新 + SSE 广播）
 └── html/
-    └── index.ts    # HTML 仪表板模板（内联 CSS/JS，SSE 客户端）
+    ├── index.ts    # HTML 模板
+    ├── css.ts      # CSS 样式导出
+    └── dashboard.ts # JavaScript 逻辑（ECharts 图谱）
 
 scripts/
 ├── init.ts         # init 命令注册
@@ -131,6 +133,23 @@ scripts/
 
 ## 变更记录
 
+### 2026-04-29 Dashboard 图谱重构（ECharts）
+
+**前端技术栈替换** - Cytoscape.js → ECharts：
+- 使用 ECharts `graph` + `force` 力导向布局，类似 Neo4j/Obsidian 效果
+- 节点可拖拽、缩放、平移，点击高亮相邻节点
+- 移除 Cytoscape.js base64 内嵌依赖，改用 CDN 加载
+- 代码拆分：`src/html/` 下 `index.ts`（模板）、`css.ts`（样式）、`dashboard.ts`（逻辑）
+
+**修复问题**：
+- `buildFileGraph()` 缺少 `directories` 导致文件数 >50 时报错
+- 布局不稳定：启用位置缓存，重复点击保持相同布局
+- 节点聚集：提高斥力参数（30000-50000）、负重力（-0.5）推开节点
+
+**注意**：
+- 修改 `src/html/` 下文件需 `node build.js` + 重启服务器
+- ECharts CDN：`https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js`
+
 ### 2026-04-29 Dashboard 实时化 + hook 修复 + 项目配置
 
 **CLI → 服务器实时通知** (`src/notify.ts` + `src/server.ts`)：
@@ -138,27 +157,16 @@ scripts/
 - 新增 `POST /api/notify` 端点 — 接收通知后通过 SSE 即时广播前端
 - 事件类型：`project-registered/unregistered`、`index|update-started/progress/completed/failed`
 - 移除 30 秒轮询 `refreshProjects`，改为 CLI 主动通知，零延迟
-- `scripts/init.ts`、`uninstall.ts`、`index_cmd.ts`、`update.ts` 在关键节点调用 notifyServer
 
-**Dashboard 进度条** (`src/html/index.ts` + `src/indexer.ts` + `src/embedder.ts`)：
+**Dashboard 进度条**：
 - embedder.embed 添加 `onProgress(current, total)` 回调
 - indexer.buildIndex 5 阶段进度：scanning → chunking → embedding → writing → deps
-- update.updateIndex 同样 5 阶段进度（通过 onProgress 回调）
-- 前端项目卡片底部显示带标签+百分比的进度条，SSE 监听实时更新
+- 前端项目卡片底部实时显示进度条，SSE 监听更新
 
-**git hook 修复** (`src/install.ts`)：
-- 异步执行：`nohup node skill.js update --quiet &` 替代同步调用，不阻塞 commit
-- husky 兼容：`checkGitHook` 检测 `core.hooksPath`，在 `.husky/post-commit`（而非 `.git/hooks/`）创建 hook
-- hook 自动升级：init 检测旧版同步 hook 时自动替换为 nohup 异步版本
-
-**项目级排除配置** (`src/install.ts` + `src/file-scanner.ts`)：
-- init 生成 `.codesense/index.json`，含 `excludeFiles`（test/spec/min 等）和 `excludeDirs`
-- scanner 在扫描阶段直接跳过匹配文件，不进入索引
-- `loadProjectConfig()` 导出供其他模块使用
-
-**注意**：
-- 修改 `src/html/index.ts` 后需 `node build.js` + 重启服务器才能生效
-- husky 项目必须重新 init 更新 hook（旧 hook 在 `.git/hooks/` 不生效）
+**git hook 修复**：
+- 异步执行：`nohup node skill.js update --quiet &` 不阻塞 commit
+- husky 兼容：检测 `core.hooksPath`，在 `.husky/post-commit` 创建 hook
+- 项目级排除配置：init 生成 `.codesense/index.json`
 
 ### 2026-04-28 Bug 修复 + 全局化改造
 
