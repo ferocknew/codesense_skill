@@ -15,11 +15,15 @@ export type Registry = Record<string, RegistryEntry>;
 export interface GlobalConfig {
   model: string;
   ollamaUrl: string;
+  batchSize: number;
+  batchDelay: number;
 }
 
 const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   model: "qwen3-embedding:0.6b",
   ollamaUrl: "http://localhost:11434",
+  batchSize: 32,
+  batchDelay: 0,
 };
 
 let _db: Database.Database | null = null;
@@ -253,14 +257,19 @@ export function dbLoadGlobalConfig(): GlobalConfig {
   return {
     model: map.model || DEFAULT_GLOBAL_CONFIG.model,
     ollamaUrl: map.ollamaUrl || DEFAULT_GLOBAL_CONFIG.ollamaUrl,
+    batchSize: map.batchSize ? parseInt(map.batchSize, 10) : DEFAULT_GLOBAL_CONFIG.batchSize,
+    batchDelay: map.batchDelay ? parseInt(map.batchDelay, 10) : DEFAULT_GLOBAL_CONFIG.batchDelay,
   };
 }
 
 export function dbSaveGlobalConfig(config: GlobalConfig): void {
   const db = getDb();
   const tx = db.transaction(() => {
-    db.prepare("INSERT OR REPLACE INTO global_config (key, value) VALUES (?, ?)").run("model", config.model);
-    db.prepare("INSERT OR REPLACE INTO global_config (key, value) VALUES (?, ?)").run("ollamaUrl", config.ollamaUrl);
+    const stmt = db.prepare("INSERT OR REPLACE INTO global_config (key, value) VALUES (?, ?)");
+    stmt.run("model", config.model);
+    stmt.run("ollamaUrl", config.ollamaUrl);
+    stmt.run("batchSize", String(config.batchSize));
+    stmt.run("batchDelay", String(config.batchDelay));
   });
   tx();
 }

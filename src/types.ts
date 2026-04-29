@@ -17,6 +17,8 @@ export interface EmbeddingConfig {
   model: string;
   dimensions: number;
   dimensionsFull: number;
+  batchSize: number;
+  batchDelay: number;
 }
 
 export interface IndexConfig {
@@ -92,6 +94,8 @@ export const DEFAULT_EMBEDDING_CONFIG: EmbeddingConfig = {
   model: "qwen3-embedding:0.6b",
   dimensions: 1024,
   dimensionsFull: 2048,
+  batchSize: 32,
+  batchDelay: 0,
 };
 
 export const EXCLUDE_DIRS = new Set([

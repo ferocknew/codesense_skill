@@ -18,7 +18,7 @@ import { loadConfig } from "./config";
 import { getTableStats } from "./index";
 import { search as searchCode } from "./search";
 import { loadDepGraph } from "./graph";
-import { closeDb, dbGetDepStats } from "./database";
+import { closeDb, dbGetDepStats, dbLoadGlobalConfig, dbSaveGlobalConfig, GlobalConfig } from "./database";
 import { appendLog, queryLogs, listLogDates } from "./logger";
 
 export interface ServerOptions {
@@ -161,7 +161,7 @@ async function handleRequest(
 
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -198,6 +198,10 @@ async function handleRequest(
       handleSSE(req, res);
     } else if (pathname === "/api/notify" && req.method === "POST") {
       handleNotify(req, res, state);
+    } else if (pathname === "/api/settings" && req.method === "GET") {
+      serveSettings(res);
+    } else if (pathname === "/api/settings" && req.method === "PUT") {
+      updateSettings(req, res);
     } else {
       sendJSON(res, 404, { ok: false, error: "Not Found" });
     }
@@ -421,6 +425,51 @@ function handleSSE(req: http.IncomingMessage, res: http.ServerResponse): void {
   sseClients.add(res);
   req.on("close", () => {
     sseClients.delete(res);
+  });
+}
+
+function serveSettings(res: http.ServerResponse): void {
+  const config = dbLoadGlobalConfig();
+  sendJSON(res, 200, {
+    ok: true,
+    data: {
+      ollamaUrl: config.ollamaUrl,
+      model: config.model,
+      batchSize: config.batchSize,
+      batchDelay: config.batchDelay,
+    },
+  });
+}
+
+function updateSettings(req: http.IncomingMessage, res: http.ServerResponse): void {
+  let body = "";
+  req.on("data", (chunk: Buffer) => { body += chunk.toString(); });
+  req.on("end", () => {
+    try {
+      const updates = JSON.parse(body);
+      const current = dbLoadGlobalConfig();
+
+      const newConfig: GlobalConfig = {
+        model: updates.model || current.model,
+        ollamaUrl: updates.ollamaUrl || current.ollamaUrl,
+        batchSize: typeof updates.batchSize === "number" ? updates.batchSize : current.batchSize,
+        batchDelay: typeof updates.batchDelay === "number" ? updates.batchDelay : current.batchDelay,
+      };
+
+      if (newConfig.batchSize < 1 || newConfig.batchSize > 100) {
+        sendJSON(res, 400, { ok: false, error: "batchSize 必须在 1-100 之间" });
+        return;
+      }
+      if (newConfig.batchDelay < 0 || newConfig.batchDelay > 10000) {
+        sendJSON(res, 400, { ok: false, error: "batchDelay 必须在 0-10000ms 之间" });
+        return;
+      }
+
+      dbSaveGlobalConfig(newConfig);
+      sendJSON(res, 200, { ok: true });
+    } catch {
+      sendJSON(res, 400, { ok: false, error: "Invalid JSON" });
+    }
   });
 }
 

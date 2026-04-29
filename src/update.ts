@@ -3,7 +3,7 @@ import * as path from "path";
 import * as crypto from "crypto";
 import { execSync } from "child_process";
 import { CodeChunk, EXT_TO_LANGUAGE } from "./types";
-import { OllamaEmbedder } from "./embedder";
+import { createEmbedderFromGlobalConfig } from "./embedder";
 import { chunkFile, buildEmbeddingInput } from "./chunker";
 import { scanDirectory } from "./file-scanner";
 import { addToTable, deleteFromTable } from "./index";
@@ -93,7 +93,7 @@ async function updateByFiles(
   onProgress?.("scanning", changedFiles.length, changedFiles.length);
 
   const dbPath = path.join(outDir, "index.lance");
-  const embedder = new OllamaEmbedder({ dimensions: config.dimensions });
+  const embedder = createEmbedderFromGlobalConfig(config.dimensions);
   await embedder.ensureModel();
 
   const toDelete: string[] = [];

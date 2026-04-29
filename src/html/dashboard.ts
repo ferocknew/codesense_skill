@@ -393,5 +393,49 @@ function loadLogs(){
 }
 
 function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+
+function showSettings(){
+  var panel=document.getElementById("cfgPanel");
+  panel.classList.toggle("visible");
+  if(panel.classList.contains("visible"))loadSettings();
+}
+
+function loadSettings(){
+  fetch("/api/settings").then(function(r){return r.json()}).then(function(res){
+    if(!res.ok)return;
+    var d=res.data;
+    document.getElementById("cfgOllamaUrl").value=d.ollamaUrl||"";
+    document.getElementById("cfgModel").value=d.model||"";
+    document.getElementById("cfgBatchSize").value=d.batchSize||32;
+    document.getElementById("cfgBatchDelay").value=d.batchDelay||0;
+  });
+}
+
+function saveSettings(){
+  var data={
+    ollamaUrl:document.getElementById("cfgOllamaUrl").value.trim(),
+    model:document.getElementById("cfgModel").value.trim(),
+    batchSize:parseInt(document.getElementById("cfgBatchSize").value)||32,
+    batchDelay:parseInt(document.getElementById("cfgBatchDelay").value)||0
+  };
+  fetch("/api/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)})
+    .then(function(r){return r.json()})
+    .then(function(res){
+      if(res.ok){
+        document.getElementById("cfgPanel").classList.remove("visible");
+        showToast("设置已保存");
+      }else{
+        alert("保存失败: "+(res.error||"unknown"));
+      }
+    })
+    .catch(function(e){alert("保存失败: "+e.message)});
+}
+
+function showToast(msg){
+  var t=document.getElementById("cfgToast");
+  t.textContent=msg;
+  t.classList.add("show");
+  setTimeout(function(){t.classList.remove("show")},2000);
+}
 `;
 }

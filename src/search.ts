@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { SearchResult, DEFAULT_TOP_K, DEFAULT_THRESHOLD, DEFAULT_EXCLUDE_FILES } from "./types";
-import { OllamaEmbedder } from "./embedder";
+import { createEmbedderFromGlobalConfig } from "./embedder";
 import { queryTable } from "./index";
 import { loadConfig } from "./config";
 import { findProjectByDir, getProjectDir, resolveProjectName, listProjects } from "./global";
@@ -39,7 +39,7 @@ async function searchSingleProject(
 
   const excludeFiles = config.excludeFiles ?? DEFAULT_EXCLUDE_FILES;
 
-  const embedder = new OllamaEmbedder({ dimensions: config.dimensions });
+  const embedder = createEmbedderFromGlobalConfig(config.dimensions);
   const queryVector = await embedder.embedQuery(query);
 
   const conditions: string[] = [];

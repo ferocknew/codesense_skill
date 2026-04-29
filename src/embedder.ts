@@ -1,4 +1,5 @@
 import { DEFAULT_EMBEDDING_CONFIG, EmbeddingConfig } from "./types";
+import { dbLoadGlobalConfig } from "./database";
 
 export class OllamaEmbedder {
   private config: EmbeddingConfig;
@@ -49,7 +50,7 @@ export class OllamaEmbedder {
     if (texts.length === 0) return [];
 
     const results: number[][] = [];
-    const batchSize = 32;
+    const batchSize = this.config.batchSize;
     const totalBatches = Math.ceil(texts.length / batchSize);
 
     for (let i = 0; i < texts.length; i += batchSize) {
@@ -80,6 +81,11 @@ export class OllamaEmbedder {
       // MRL 截断: API 返回 dimensionsFull 维，截断到目标维度
       const truncated = data.embeddings.map((e) => e.slice(0, this.config.dimensions));
       results.push(...truncated);
+
+      // 批次间延迟
+      if (this.config.batchDelay > 0 && i + batchSize < texts.length) {
+        await new Promise((resolve) => setTimeout(resolve, this.config.batchDelay));
+      }
     }
 
     return results;
@@ -93,4 +99,15 @@ export class OllamaEmbedder {
   getConfig(): Readonly<EmbeddingConfig> {
     return { ...this.config };
   }
+}
+
+export function createEmbedderFromGlobalConfig(dimensions: number): OllamaEmbedder {
+  const gc = dbLoadGlobalConfig();
+  return new OllamaEmbedder({
+    baseUrl: gc.ollamaUrl,
+    model: gc.model,
+    dimensions,
+    batchSize: gc.batchSize,
+    batchDelay: gc.batchDelay,
+  });
 }

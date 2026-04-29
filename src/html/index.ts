@@ -20,7 +20,7 @@ ${getDashboardCSS()}
 <body>
 <div class="app">
 <div class="sidebar">
-  <div class="sidebar-hd"><h1>codesense</h1><span id="uptime">${uptime}</span></div>
+  <div class="sidebar-hd"><h1>codesense</h1><div style="display:flex;gap:8px;align-items:center"><button class="btn" onclick="showSettings()" title="设置" style="font-size:14px;padding:2px 8px;cursor:pointer">&#9881;</button><span id="uptime">${uptime}</span></div></div>
   <div class="proj-list" id="projList">
     ${projects.map((p) => projItem(p)).join("\n    ")}
   </div>
@@ -57,6 +57,37 @@ ${getDashboardCSS()}
   </div>
   <div class="log-body" id="logBody"></div>
 </div>
+<div class="cfg-overlay" id="cfgPanel">
+  <div class="cfg-hd">
+    <h2>Embedding 设置</h2>
+    <button class="close" onclick="document.getElementById('cfgPanel').classList.remove('visible')">&times;</button>
+  </div>
+  <div class="cfg-body">
+    <div class="cfg-group">
+      <label>Ollama URL</label>
+      <input type="text" id="cfgOllamaUrl" placeholder="http://localhost:11434" />
+    </div>
+    <div class="cfg-group">
+      <label>Model</label>
+      <input type="text" id="cfgModel" placeholder="qwen3-embedding:0.6b" />
+    </div>
+    <div class="cfg-group">
+      <label>Batch Size</label>
+      <input type="number" id="cfgBatchSize" min="1" max="100" placeholder="32" />
+      <div class="cfg-hint">每批处理的文本数量。低配机器建议 5-10</div>
+    </div>
+    <div class="cfg-group">
+      <label>Batch Delay (ms)</label>
+      <input type="number" id="cfgBatchDelay" min="0" max="10000" step="50" placeholder="0" />
+      <div class="cfg-hint">批次间间隔。低配机器建议 200-500ms</div>
+    </div>
+  </div>
+  <div class="cfg-actions">
+    <button class="cfg-save" onclick="saveSettings()">保存</button>
+    <button class="btn" onclick="document.getElementById('cfgPanel').classList.remove('visible')">取消</button>
+  </div>
+</div>
+<div class="cfg-toast" id="cfgToast"></div>
 <script src="https://unpkg.com/graphology@0.25.4/dist/graphology.umd.min.js"></script>
 <script src="https://unpkg.com/sigma@2.4.0/build/sigma.min.js"></script>
 <script>

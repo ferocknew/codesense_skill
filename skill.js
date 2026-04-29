@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// codesense - 本地语义代码搜索 v260429.155319
+// codesense - 本地语义代码搜索 v260429.164126
 
 "use strict";
 var __create = Object.create;
@@ -969,7 +969,7 @@ var require_command = __commonJS({
   "node_modules/.pnpm/commander@12.1.0/node_modules/commander/lib/command.js"(exports2) {
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
-    var path12 = require("node:path");
+    var path13 = require("node:path");
     var fs12 = require("node:fs");
     var process2 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
@@ -1902,9 +1902,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path12.resolve(baseDir, baseName);
+          const localBin = path13.resolve(baseDir, baseName);
           if (fs12.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path12.extname(baseName))) return void 0;
+          if (sourceExt.includes(path13.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
             (ext) => fs12.existsSync(`${localBin}${ext}`)
           );
@@ -1922,17 +1922,17 @@ Expecting one of '${allowedValues.join("', '")}'`);
           } catch (err) {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path12.resolve(
-            path12.dirname(resolvedScriptPath),
+          executableDir = path13.resolve(
+            path13.dirname(resolvedScriptPath),
             executableDir
           );
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path12.basename(
+            const legacyName = path13.basename(
               this._scriptPath,
-              path12.extname(this._scriptPath)
+              path13.extname(this._scriptPath)
             );
             if (legacyName !== this._name) {
               localFile = findFile(
@@ -1943,7 +1943,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path12.extname(executableFile));
+        launchWithNode = sourceExt.includes(path13.extname(executableFile));
         let proc;
         if (process2.platform !== "win32") {
           if (launchWithNode) {
@@ -2783,7 +2783,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path12.basename(filename, path12.extname(filename));
+        this._name = path13.basename(filename, path13.extname(filename));
         return this;
       }
       /**
@@ -2797,9 +2797,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {(string|null|Command)}
        */
-      executableDir(path13) {
-        if (path13 === void 0) return this._executableDir;
-        this._executableDir = path13;
+      executableDir(path14) {
+        if (path14 === void 0) return this._executableDir;
+        this._executableDir = path14;
         return this;
       }
       /**
@@ -3055,7 +3055,9 @@ var init_types = __esm({
       baseUrl: "http://localhost:11434",
       model: "qwen3-embedding:0.6b",
       dimensions: 1024,
-      dimensionsFull: 2048
+      dimensionsFull: 2048,
+      batchSize: 32,
+      batchDelay: 0
     };
     EXCLUDE_DIRS = /* @__PURE__ */ new Set([
       ".git",
@@ -3111,95 +3113,6 @@ var init_types = __esm({
       "c",
       "cpp"
     ]);
-  }
-});
-
-// src/embedder.ts
-var embedder_exports = {};
-__export(embedder_exports, {
-  OllamaEmbedder: () => OllamaEmbedder
-});
-var OllamaEmbedder;
-var init_embedder = __esm({
-  "src/embedder.ts"() {
-    "use strict";
-    init_types();
-    OllamaEmbedder = class {
-      config;
-      constructor(config) {
-        this.config = { ...DEFAULT_EMBEDDING_CONFIG, ...config };
-      }
-      async checkHealth() {
-        try {
-          const resp = await fetch(`${this.config.baseUrl}/api/tags`);
-          if (!resp.ok) {
-            return { ok: false, modelAvailable: false, error: `HTTP ${resp.status}` };
-          }
-          const data = await resp.json();
-          const modelAvailable = data.models.some(
-            (m) => m.name === this.config.model || m.name.startsWith(this.config.model + ":")
-          );
-          return { ok: true, modelAvailable, error: modelAvailable ? void 0 : `\u6A21\u578B ${this.config.model} \u672A\u627E\u5230` };
-        } catch (e) {
-          return {
-            ok: false,
-            modelAvailable: false,
-            error: `Ollama \u4E0D\u53EF\u7528 (${this.config.baseUrl}): ${e.message}\u3002\u8BF7\u786E\u8BA4 Ollama \u6B63\u5728\u8FD0\u884C\u3002`
-          };
-        }
-      }
-      async ensureModel() {
-        const health = await this.checkHealth();
-        if (!health.ok) {
-          console.error(`\u9519\u8BEF: ${health.error}`);
-          console.error("\u8BF7\u5148\u5B89\u88C5\u5E76\u542F\u52A8 Ollama: https://ollama.com");
-          process.exit(1);
-        }
-        if (!health.modelAvailable) {
-          console.error(`\u9519\u8BEF: \u6A21\u578B ${this.config.model} \u672A\u627E\u5230`);
-          console.error(`\u8BF7\u8FD0\u884C: ollama pull ${this.config.model}`);
-          process.exit(1);
-        }
-      }
-      async embed(texts, onProgress) {
-        if (texts.length === 0) return [];
-        const results = [];
-        const batchSize = 32;
-        const totalBatches = Math.ceil(texts.length / batchSize);
-        for (let i = 0; i < texts.length; i += batchSize) {
-          const batch = texts.slice(i, i + batchSize);
-          const batchNum = Math.floor(i / batchSize) + 1;
-          if (totalBatches > 1) {
-            process.stderr.write(`  Embedding batch ${batchNum}/${totalBatches}...
-`);
-            onProgress?.(batchNum, totalBatches);
-          }
-          const resp = await fetch(`${this.config.baseUrl}/api/embed`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ model: this.config.model, input: batch })
-          });
-          if (!resp.ok) {
-            const errText = await resp.text();
-            throw new Error(`Ollama embed API \u9519\u8BEF (HTTP ${resp.status}): ${errText}`);
-          }
-          const data = await resp.json();
-          if (!data.embeddings || data.embeddings.length !== batch.length) {
-            throw new Error(`Ollama \u8FD4\u56DE\u7684 embeddings \u6570\u91CF\u4E0D\u5339\u914D: \u671F\u671B ${batch.length}, \u5B9E\u9645 ${data.embeddings?.length}`);
-          }
-          const truncated = data.embeddings.map((e) => e.slice(0, this.config.dimensions));
-          results.push(...truncated);
-        }
-        return results;
-      }
-      async embedQuery(text) {
-        const results = await this.embed([text]);
-        return results[0];
-      }
-      getConfig() {
-        return { ...this.config };
-      }
-    };
   }
 });
 
@@ -3425,14 +3338,19 @@ function dbLoadGlobalConfig() {
   for (const r of rows) map[r.key] = r.value;
   return {
     model: map.model || DEFAULT_GLOBAL_CONFIG.model,
-    ollamaUrl: map.ollamaUrl || DEFAULT_GLOBAL_CONFIG.ollamaUrl
+    ollamaUrl: map.ollamaUrl || DEFAULT_GLOBAL_CONFIG.ollamaUrl,
+    batchSize: map.batchSize ? parseInt(map.batchSize, 10) : DEFAULT_GLOBAL_CONFIG.batchSize,
+    batchDelay: map.batchDelay ? parseInt(map.batchDelay, 10) : DEFAULT_GLOBAL_CONFIG.batchDelay
   };
 }
 function dbSaveGlobalConfig(config) {
   const db = getDb();
   const tx = db.transaction(() => {
-    db.prepare("INSERT OR REPLACE INTO global_config (key, value) VALUES (?, ?)").run("model", config.model);
-    db.prepare("INSERT OR REPLACE INTO global_config (key, value) VALUES (?, ?)").run("ollamaUrl", config.ollamaUrl);
+    const stmt = db.prepare("INSERT OR REPLACE INTO global_config (key, value) VALUES (?, ?)");
+    stmt.run("model", config.model);
+    stmt.run("ollamaUrl", config.ollamaUrl);
+    stmt.run("batchSize", String(config.batchSize));
+    stmt.run("batchDelay", String(config.batchDelay));
   });
   tx();
 }
@@ -3603,9 +3521,115 @@ var init_database = __esm({
     os = __toESM(require("os"));
     DEFAULT_GLOBAL_CONFIG = {
       model: "qwen3-embedding:0.6b",
-      ollamaUrl: "http://localhost:11434"
+      ollamaUrl: "http://localhost:11434",
+      batchSize: 32,
+      batchDelay: 0
     };
     _db = null;
+  }
+});
+
+// src/embedder.ts
+var embedder_exports = {};
+__export(embedder_exports, {
+  OllamaEmbedder: () => OllamaEmbedder,
+  createEmbedderFromGlobalConfig: () => createEmbedderFromGlobalConfig
+});
+function createEmbedderFromGlobalConfig(dimensions) {
+  const gc = dbLoadGlobalConfig();
+  return new OllamaEmbedder({
+    baseUrl: gc.ollamaUrl,
+    model: gc.model,
+    dimensions,
+    batchSize: gc.batchSize,
+    batchDelay: gc.batchDelay
+  });
+}
+var OllamaEmbedder;
+var init_embedder = __esm({
+  "src/embedder.ts"() {
+    "use strict";
+    init_types();
+    init_database();
+    OllamaEmbedder = class {
+      config;
+      constructor(config) {
+        this.config = { ...DEFAULT_EMBEDDING_CONFIG, ...config };
+      }
+      async checkHealth() {
+        try {
+          const resp = await fetch(`${this.config.baseUrl}/api/tags`);
+          if (!resp.ok) {
+            return { ok: false, modelAvailable: false, error: `HTTP ${resp.status}` };
+          }
+          const data = await resp.json();
+          const modelAvailable = data.models.some(
+            (m) => m.name === this.config.model || m.name.startsWith(this.config.model + ":")
+          );
+          return { ok: true, modelAvailable, error: modelAvailable ? void 0 : `\u6A21\u578B ${this.config.model} \u672A\u627E\u5230` };
+        } catch (e) {
+          return {
+            ok: false,
+            modelAvailable: false,
+            error: `Ollama \u4E0D\u53EF\u7528 (${this.config.baseUrl}): ${e.message}\u3002\u8BF7\u786E\u8BA4 Ollama \u6B63\u5728\u8FD0\u884C\u3002`
+          };
+        }
+      }
+      async ensureModel() {
+        const health = await this.checkHealth();
+        if (!health.ok) {
+          console.error(`\u9519\u8BEF: ${health.error}`);
+          console.error("\u8BF7\u5148\u5B89\u88C5\u5E76\u542F\u52A8 Ollama: https://ollama.com");
+          process.exit(1);
+        }
+        if (!health.modelAvailable) {
+          console.error(`\u9519\u8BEF: \u6A21\u578B ${this.config.model} \u672A\u627E\u5230`);
+          console.error(`\u8BF7\u8FD0\u884C: ollama pull ${this.config.model}`);
+          process.exit(1);
+        }
+      }
+      async embed(texts, onProgress) {
+        if (texts.length === 0) return [];
+        const results = [];
+        const batchSize = this.config.batchSize;
+        const totalBatches = Math.ceil(texts.length / batchSize);
+        for (let i = 0; i < texts.length; i += batchSize) {
+          const batch = texts.slice(i, i + batchSize);
+          const batchNum = Math.floor(i / batchSize) + 1;
+          if (totalBatches > 1) {
+            process.stderr.write(`  Embedding batch ${batchNum}/${totalBatches}...
+`);
+            onProgress?.(batchNum, totalBatches);
+          }
+          const resp = await fetch(`${this.config.baseUrl}/api/embed`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: this.config.model, input: batch })
+          });
+          if (!resp.ok) {
+            const errText = await resp.text();
+            throw new Error(`Ollama embed API \u9519\u8BEF (HTTP ${resp.status}): ${errText}`);
+          }
+          const data = await resp.json();
+          if (!data.embeddings || data.embeddings.length !== batch.length) {
+            throw new Error(`Ollama \u8FD4\u56DE\u7684 embeddings \u6570\u91CF\u4E0D\u5339\u914D: \u671F\u671B ${batch.length}, \u5B9E\u9645 ${data.embeddings?.length}`);
+          }
+          const truncated = data.embeddings.map((e) => e.slice(0, this.config.dimensions));
+          results.push(...truncated);
+          if (this.config.batchDelay > 0 && i + batchSize < texts.length) {
+            await new Promise((resolve9) => setTimeout(resolve9, this.config.batchDelay));
+          }
+        }
+        return results;
+      }
+      async embedQuery(text) {
+        const results = await this.embed([text]);
+        return results[0];
+      }
+      getConfig() {
+        return { ...this.config };
+      }
+    };
   }
 });
 
@@ -3691,7 +3715,9 @@ var init_global = __esm({
     init_database();
     DEFAULT_GLOBAL_CONFIG2 = {
       model: "qwen3-embedding:0.6b",
-      ollamaUrl: "http://localhost:11434"
+      ollamaUrl: "http://localhost:11434",
+      batchSize: 32,
+      batchDelay: 0
     };
   }
 });
@@ -3801,9 +3827,9 @@ async function checkOrPullModel() {
     return;
   }
   process.stdout.write("  \u8F93\u5165 y \u786E\u8BA4\u4E0B\u8F7D: ");
-  const answer = await new Promise((resolve8) => {
-    process.stdin.once("data", (data) => resolve8(data.toString().trim().toLowerCase()));
-    setTimeout(() => resolve8("n"), 3e4);
+  const answer = await new Promise((resolve9) => {
+    process.stdin.once("data", (data) => resolve9(data.toString().trim().toLowerCase()));
+    setTimeout(() => resolve9("n"), 3e4);
   });
   if (answer !== "y" && answer !== "yes") {
     console.error(`\u2717 \u8BF7\u624B\u52A8\u8FD0\u884C: ollama pull ${modelName} \u540E\u91CD\u65B0 init`);
@@ -3821,7 +3847,7 @@ async function checkOrPullModel() {
 function initializeDatabase2() {
   ensureGlobalDir();
   getDb();
-  dbSaveGlobalConfig({ model: "qwen3-embedding:0.6b", ollamaUrl: "http://localhost:11434" });
+  dbSaveGlobalConfig({ model: "qwen3-embedding:0.6b", ollamaUrl: "http://localhost:11434", batchSize: 32, batchDelay: 0 });
   console.log("\u2713 \u6570\u636E\u5E93\u5DF2\u521D\u59CB\u5316 (~/.codesense/codesense.db)");
 }
 function integrateProject(absDir, projectName) {
@@ -3979,7 +4005,7 @@ async function init(projectDir) {
   integrateProject(absDir, projectName);
   console.log(`
 \u521D\u59CB\u5316\u5B8C\u6210\uFF01\u9879\u76EE: ${projectName}`);
-  console.log(`  \u8FD0\u884C \`codesense index ${absDir}\` \u5EFA\u7ACB\u9996\u6B21\u7D22\u5F15\u3002`);
+  console.log(`  \u8FD0\u884C \`codesense index ${absDir}\` \u5EFA\u7ACB\u9996\u6B21\u7D22\u5F15\uFF08\u81EA\u52A8\u540E\u53F0\u6267\u884C\uFF09\u3002`);
 }
 var fs3, path3, import_child_process, CLAUDE_MD_MARKER, CLAUDE_MD_END_MARKER, HOOK_MARKER, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE, DEFAULT_PROJECT_CONFIG;
 var init_install = __esm({
@@ -4114,6 +4140,107 @@ var init_config = __esm({
     "use strict";
     init_global();
     init_database();
+  }
+});
+
+// scripts/forward.ts
+var forward_exports = {};
+__export(forward_exports, {
+  ensureServer: () => ensureServer,
+  forwardToServer: () => forwardToServer
+});
+function isServerReady() {
+  return new Promise((resolve9) => {
+    const req = http.request(
+      { hostname: "localhost", port: DEFAULT_PORT2, path: "/api/status", method: "GET", timeout: 1500 },
+      (res) => {
+        res.resume();
+        res.on("end", () => resolve9(res.statusCode === 200));
+      }
+    );
+    req.on("error", () => resolve9(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve9(false);
+    });
+    req.end();
+  });
+}
+function startServerInBackground() {
+  const skillJs = path4.resolve(__dirname, "..", "skill.js");
+  const child = (0, import_child_process2.spawn)("node", [skillJs, "server", "--port", String(DEFAULT_PORT2)], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true
+  });
+  child.unref();
+  console.log(`\u540E\u53F0\u542F\u52A8 server (PID: ${child.pid})...`);
+}
+async function ensureServer() {
+  if (await isServerReady()) return;
+  startServerInBackground();
+  const start = Date.now();
+  while (Date.now() - start < MAX_WAIT_MS) {
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    if (await isServerReady()) {
+      console.log(`server \u5DF2\u5C31\u7EEA: http://localhost:${DEFAULT_PORT2}`);
+      return;
+    }
+  }
+  console.log("server \u542F\u52A8\u8D85\u65F6\uFF0C\u5C06\u672C\u5730\u6267\u884C");
+}
+async function forwardToServer(action, projectName) {
+  await ensureServer();
+  return new Promise((resolve9) => {
+    const postData = JSON.stringify({});
+    const req = http.request(
+      {
+        hostname: "localhost",
+        port: DEFAULT_PORT2,
+        path: `/api/${action}/${encodeURIComponent(projectName)}`,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(postData) },
+        timeout: 5e3
+      },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk) => {
+          body += chunk.toString();
+        });
+        res.on("end", () => {
+          if (res.statusCode === 200) {
+            try {
+              const data = JSON.parse(body);
+              console.log(data.data?.message || `\u5DF2\u63D0\u4EA4\u540E\u53F0${action === "index" ? "\u7D22\u5F15" : "\u66F4\u65B0"}\u4EFB\u52A1: ${projectName}`);
+            } catch {
+              console.log(`\u5DF2\u63D0\u4EA4\u540E\u53F0\u4EFB\u52A1: ${projectName}`);
+            }
+            resolve9(true);
+          } else {
+            resolve9(false);
+          }
+        });
+      }
+    );
+    req.on("error", () => resolve9(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve9(false);
+    });
+    req.write(postData);
+    req.end();
+  });
+}
+var http, import_child_process2, path4, DEFAULT_PORT2, MAX_WAIT_MS, POLL_INTERVAL_MS;
+var init_forward = __esm({
+  "scripts/forward.ts"() {
+    "use strict";
+    http = __toESM(require("http"));
+    import_child_process2 = require("child_process");
+    path4 = __toESM(require("path"));
+    DEFAULT_PORT2 = 54321;
+    MAX_WAIT_MS = 8e3;
+    POLL_INTERVAL_MS = 300;
   }
 });
 
@@ -4695,8 +4822,8 @@ function scanDirectory(dir, rootDir) {
     }
     for (const entry of entries) {
       if (entry.name.startsWith(".") && entry.name !== ".env") continue;
-      const fullPath = path4.join(currentDir, entry.name);
-      const relPath = path4.relative(root, fullPath);
+      const fullPath = path5.join(currentDir, entry.name);
+      const relPath = path5.relative(root, fullPath);
       if (entry.isDirectory()) {
         if (EXCLUDE_DIRS.has(entry.name)) continue;
         if (excludeDirs.some((d) => entry.name === d || relPath === d || relPath.startsWith(d + "/"))) continue;
@@ -4705,7 +4832,7 @@ function scanDirectory(dir, rootDir) {
       } else if (entry.isFile()) {
         if (isIgnored(relPath, gitignorePatterns)) continue;
         if (matchExcludePattern(relPath, excludeFiles)) continue;
-        const ext = path4.extname(entry.name).toLowerCase();
+        const ext = path5.extname(entry.name).toLowerCase();
         const language = EXT_TO_LANGUAGE[ext];
         if (!language) continue;
         results.push({
@@ -4720,7 +4847,7 @@ function scanDirectory(dir, rootDir) {
   return results;
 }
 function loadGitignore(rootDir) {
-  const giPath = path4.join(rootDir, ".gitignore");
+  const giPath = path5.join(rootDir, ".gitignore");
   if (!fs4.existsSync(giPath)) return [];
   try {
     const content = fs4.readFileSync(giPath, "utf-8");
@@ -4773,12 +4900,12 @@ function getLanguage2(ext) {
 function hasTreeSitterSupport(language) {
   return TREE_SITTER_LANGUAGES.has(language);
 }
-var fs4, path4;
+var fs4, path5;
 var init_file_scanner = __esm({
   "src/file-scanner.ts"() {
     "use strict";
     fs4 = __toESM(require("fs"));
-    path4 = __toESM(require("path"));
+    path5 = __toESM(require("path"));
     init_types();
     init_install();
   }
@@ -5073,8 +5200,8 @@ function buildTSImportMap(root, filePath, content) {
     if (!sourceNode) return;
     const modulePath = getNodeText(sourceNode, content).replace(/['"]/g, "");
     if (!modulePath.startsWith(".")) return;
-    const dir = path5.dirname(filePath);
-    let resolvedRelPath = path5.relative(process.cwd(), path5.resolve(dir, modulePath));
+    const dir = path6.dirname(filePath);
+    let resolvedRelPath = path6.relative(process.cwd(), path6.resolve(dir, modulePath));
     if (!resolvedRelPath.match(/\.(ts|tsx|js|jsx)$/)) {
       resolvedRelPath += ".ts";
     }
@@ -5113,8 +5240,8 @@ function collectTSImports(node, filePath, content, graph) {
     if (!sourceNode) return;
     const modulePath = getNodeText(sourceNode, content).replace(/['"]/g, "");
     if (modulePath.startsWith(".")) {
-      const dir = path5.dirname(filePath);
-      let importedRelPath = path5.relative(process.cwd(), path5.resolve(dir, modulePath));
+      const dir = path6.dirname(filePath);
+      let importedRelPath = path6.relative(process.cwd(), path6.resolve(dir, modulePath));
       if (!importedRelPath.match(/\.(ts|tsx|js|jsx)$/)) {
         importedRelPath += ".ts";
       }
@@ -5250,11 +5377,11 @@ function loadDepGraph(projectName) {
 function removeFileFromGraph(projectName, filePath) {
   dbRemoveFileFromGraph(projectName, filePath);
 }
-var path5, TS_BUILTINS, PYTHON_BUILTINS;
+var path6, TS_BUILTINS, PYTHON_BUILTINS;
 var init_graph = __esm({
   "src/graph.ts"() {
     "use strict";
-    path5 = __toESM(require("path"));
+    path6 = __toESM(require("path"));
     init_database();
     init_parser();
     TS_BUILTINS = /* @__PURE__ */ new Set([
@@ -5360,7 +5487,7 @@ async function buildIndex(dir, options = {}) {
   const quiet = options.quiet || false;
   const exitOnError = options.exitOnError !== false;
   const onProgress = options.onProgress;
-  const absDir = path6.resolve(dir);
+  const absDir = path7.resolve(dir);
   const projectName = resolveProjectName(absDir);
   const files = scanDirectory(absDir);
   if (files.length === 0) {
@@ -5390,7 +5517,7 @@ async function buildIndex(dir, options = {}) {
   onProgress?.("chunking", allChunks.length, allChunks.length);
   const dimensions = resolveDimensions(allChunks.length, strategy);
   if (!quiet) console.log(`\u5411\u91CF\u7EF4\u5EA6: ${dimensions} (\u7B56\u7565: ${strategy}, chunks: ${allChunks.length})`);
-  const embedder = new OllamaEmbedder({ dimensions });
+  const embedder = createEmbedderFromGlobalConfig(dimensions);
   if (!quiet) process.stderr.write("\u68C0\u67E5 Ollama...\n");
   await embedder.ensureModel();
   if (!quiet) process.stderr.write("\u751F\u6210\u5411\u91CF...\n");
@@ -5411,7 +5538,7 @@ async function buildIndex(dir, options = {}) {
     context: chunk.context
   }));
   const outDir = ensureProjectOutputDir(projectName);
-  const dbPath = path6.join(outDir, "index.lance");
+  const dbPath = path7.join(outDir, "index.lance");
   if (!quiet) process.stderr.write("\u5199\u5165\u7D22\u5F15...\n");
   onProgress?.("writing", 0, records.length);
   await createTable(dbPath, records);
@@ -5456,12 +5583,12 @@ async function buildIndex(dir, options = {}) {
     console.log(`  \u8F93\u51FA\u76EE\u5F55: ${outDir}`);
   }
 }
-var fs6, path6;
+var fs6, path7;
 var init_indexer = __esm({
   "src/indexer.ts"() {
     "use strict";
     fs6 = __toESM(require("fs"));
-    path6 = __toESM(require("path"));
+    path7 = __toESM(require("path"));
     init_types();
     init_embedder();
     init_chunker();
@@ -5494,7 +5621,7 @@ async function searchSingleProject(query, projectName, options) {
   const config = loadConfig(projectName);
   if (!config) return [];
   const excludeFiles = config.excludeFiles ?? DEFAULT_EXCLUDE_FILES;
-  const embedder = new OllamaEmbedder({ dimensions: config.dimensions });
+  const embedder = createEmbedderFromGlobalConfig(config.dimensions);
   const queryVector = await embedder.embedQuery(query);
   const conditions = [];
   if (options.type) {
@@ -5507,7 +5634,7 @@ async function searchSingleProject(query, projectName, options) {
     conditions.push(`"filePath" LIKE '${options.dir}%'`);
   }
   const where = conditions.length > 0 ? conditions.join(" AND ") : void 0;
-  const dbPath = path7.join(outDir, "index.lance");
+  const dbPath = path8.join(outDir, "index.lance");
   if (!fs7.existsSync(dbPath)) return [];
   const rawResults = await queryTable(dbPath, queryVector, { limit: topK, where });
   return rawResults.map((r) => ({
@@ -5548,12 +5675,12 @@ async function search(query, options = {}) {
   }
   return searchSingleProject(query, projectName, options);
 }
-var fs7, path7;
+var fs7, path8;
 var init_search = __esm({
   "src/search.ts"() {
     "use strict";
     fs7 = __toESM(require("fs"));
-    path7 = __toESM(require("path"));
+    path8 = __toESM(require("path"));
     init_types();
     init_embedder();
     init_index();
@@ -5728,7 +5855,7 @@ function ensureLogsDir() {
 }
 function logFile(date) {
   const d = date || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  return path8.join(LOGS_DIR, `${d}.log`);
+  return path9.join(LOGS_DIR, `${d}.log`);
 }
 function appendLog(entry) {
   ensureLogsDir();
@@ -5758,14 +5885,14 @@ function listLogDates() {
   const files = fs8.readdirSync(LOGS_DIR).filter((f) => f.endsWith(".log")).sort().reverse();
   return files.map((f) => f.replace(".log", ""));
 }
-var fs8, path8, os3, LOGS_DIR;
+var fs8, path9, os3, LOGS_DIR;
 var init_logger = __esm({
   "src/logger.ts"() {
     "use strict";
     fs8 = __toESM(require("fs"));
-    path8 = __toESM(require("path"));
+    path9 = __toESM(require("path"));
     os3 = __toESM(require("os"));
-    LOGS_DIR = path8.join(os3.homedir(), ".codesense", "logs");
+    LOGS_DIR = path9.join(os3.homedir(), ".codesense", "logs");
   }
 });
 
@@ -5782,13 +5909,13 @@ function resolveProject2(dir) {
   const projectName = resolveProjectName(dir);
   const config = loadConfig(projectName);
   if (config) {
-    return { projectName, indexDir: path9.resolve(dir) };
+    return { projectName, indexDir: path10.resolve(dir) };
   }
   return null;
 }
 function getLastCommitHash(projectName) {
   try {
-    const f = path9.join(getProjectDir(projectName), ".last-commit");
+    const f = path10.join(getProjectDir(projectName), ".last-commit");
     return fs9.existsSync(f) ? fs9.readFileSync(f, "utf-8").trim() : null;
   } catch {
     return null;
@@ -5796,20 +5923,20 @@ function getLastCommitHash(projectName) {
 }
 function saveLastCommitHash(projectName, hash) {
   try {
-    fs9.writeFileSync(path9.join(getProjectDir(projectName), ".last-commit"), hash, "utf-8");
+    fs9.writeFileSync(path10.join(getProjectDir(projectName), ".last-commit"), hash, "utf-8");
   } catch {
   }
 }
 function getGitHeadHash(indexDir) {
   try {
-    return (0, import_child_process2.execSync)("git rev-parse HEAD", { cwd: indexDir, encoding: "utf-8", timeout: 5e3 }).trim();
+    return (0, import_child_process3.execSync)("git rev-parse HEAD", { cwd: indexDir, encoding: "utf-8", timeout: 5e3 }).trim();
   } catch {
     return null;
   }
 }
 function getGitChangedFiles(indexDir) {
   try {
-    const output = (0, import_child_process2.execSync)("git diff-tree --no-commit-id --name-only -r HEAD", {
+    const output = (0, import_child_process3.execSync)("git diff-tree --no-commit-id --name-only -r HEAD", {
       cwd: indexDir,
       encoding: "utf-8",
       timeout: 5e3
@@ -5832,14 +5959,14 @@ async function updateByFiles(projectName, indexDir, changedFiles, options = {}) 
   if (!quiet) console.log(`\u5904\u7406 ${changedFiles.length} \u4E2A\u53D8\u66F4\u6587\u4EF6...`);
   const onProgress = options.onProgress;
   onProgress?.("scanning", changedFiles.length, changedFiles.length);
-  const dbPath = path9.join(outDir, "index.lance");
-  const embedder = new OllamaEmbedder({ dimensions: config.dimensions });
+  const dbPath = path10.join(outDir, "index.lance");
+  const embedder = createEmbedderFromGlobalConfig(config.dimensions);
   await embedder.ensureModel();
   const toDelete = [];
   const processable = [];
   for (const file of changedFiles) {
-    const absPath = path9.resolve(indexDir, file);
-    const ext = path9.extname(file);
+    const absPath = path10.resolve(indexDir, file);
+    const ext = path10.extname(file);
     if (!fs9.existsSync(absPath)) {
       toDelete.push(file);
     } else if (EXT_TO_LANGUAGE[ext]) {
@@ -5955,7 +6082,7 @@ async function updateByManifest(dir, options = {}) {
     ...diff.added,
     ...diff.modified.map((fp) => {
       const f = files.find((f2) => f2.filePath === fp);
-      return f ? f.relativePath : path9.relative(indexDir, fp);
+      return f ? f.relativePath : path10.relative(indexDir, fp);
     })
   ];
   saveManifest(projectName, newManifest);
@@ -6001,14 +6128,14 @@ async function updateIndex(dir, options = {}) {
     throw e;
   }
 }
-var fs9, path9, crypto3, import_child_process2;
+var fs9, path10, crypto3, import_child_process3;
 var init_update = __esm({
   "src/update.ts"() {
     "use strict";
     fs9 = __toESM(require("fs"));
-    path9 = __toESM(require("path"));
+    path10 = __toESM(require("path"));
     crypto3 = __toESM(require("crypto"));
-    import_child_process2 = require("child_process");
+    import_child_process3 = require("child_process");
     init_types();
     init_embedder();
     init_chunker();
@@ -6030,7 +6157,7 @@ __export(uninstall_exports, {
   uninstall: () => uninstall
 });
 async function uninstall(projectDir) {
-  const absDir = path10.resolve(projectDir || ".");
+  const absDir = path11.resolve(projectDir || ".");
   const projectName = resolveProjectName(absDir);
   dbDeleteProjectData(projectName);
   console.log(`\u2713 \u9879\u76EE "${projectName}" \u6570\u636E\u5DF2\u4ECE\u6570\u636E\u5E93\u79FB\u9664`);
@@ -6039,7 +6166,7 @@ async function uninstall(projectDir) {
     fs10.rmSync(projectDataDir, { recursive: true, force: true });
     console.log(`\u2713 \u5DF2\u6E05\u7406\u7D22\u5F15\u6570\u636E: ${projectDataDir}`);
   }
-  const claudeMdPath = path10.resolve(absDir, "CLAUDE.md");
+  const claudeMdPath = path11.resolve(absDir, "CLAUDE.md");
   if (fs10.existsSync(claudeMdPath)) {
     let content = fs10.readFileSync(claudeMdPath, "utf-8");
     if (content.includes(CLAUDE_MD_MARKER)) {
@@ -6060,7 +6187,7 @@ async function uninstall(projectDir) {
       console.log("  CLAUDE.md \u4E2D\u672A\u627E\u5230 codesense \u6BB5\u843D\u3002");
     }
   }
-  const hookPath = path10.resolve(absDir, ".git", "hooks", "post-commit");
+  const hookPath = path11.resolve(absDir, ".git", "hooks", "post-commit");
   if (fs10.existsSync(hookPath)) {
     let content = fs10.readFileSync(hookPath, "utf-8");
     if (content.includes(HOOK_MARKER)) {
@@ -6093,12 +6220,12 @@ async function uninstall(projectDir) {
   console.log(`
 codesense \u96C6\u6210\u5DF2\u5378\u8F7D\u3002\u9879\u76EE: ${projectName}`);
 }
-var fs10, path10;
+var fs10, path11;
 var init_uninstall = __esm({
   "src/uninstall.ts"() {
     "use strict";
     fs10 = __toESM(require("fs"));
-    path10 = __toESM(require("path"));
+    path11 = __toESM(require("path"));
     init_install();
     init_global();
     init_database();
@@ -6542,6 +6669,50 @@ function loadLogs(){
 }
 
 function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+
+function showSettings(){
+  var panel=document.getElementById("cfgPanel");
+  panel.classList.toggle("visible");
+  if(panel.classList.contains("visible"))loadSettings();
+}
+
+function loadSettings(){
+  fetch("/api/settings").then(function(r){return r.json()}).then(function(res){
+    if(!res.ok)return;
+    var d=res.data;
+    document.getElementById("cfgOllamaUrl").value=d.ollamaUrl||"";
+    document.getElementById("cfgModel").value=d.model||"";
+    document.getElementById("cfgBatchSize").value=d.batchSize||32;
+    document.getElementById("cfgBatchDelay").value=d.batchDelay||0;
+  });
+}
+
+function saveSettings(){
+  var data={
+    ollamaUrl:document.getElementById("cfgOllamaUrl").value.trim(),
+    model:document.getElementById("cfgModel").value.trim(),
+    batchSize:parseInt(document.getElementById("cfgBatchSize").value)||32,
+    batchDelay:parseInt(document.getElementById("cfgBatchDelay").value)||0
+  };
+  fetch("/api/settings",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)})
+    .then(function(r){return r.json()})
+    .then(function(res){
+      if(res.ok){
+        document.getElementById("cfgPanel").classList.remove("visible");
+        showToast("\u8BBE\u7F6E\u5DF2\u4FDD\u5B58");
+      }else{
+        alert("\u4FDD\u5B58\u5931\u8D25: "+(res.error||"unknown"));
+      }
+    })
+    .catch(function(e){alert("\u4FDD\u5B58\u5931\u8D25: "+e.message)});
+}
+
+function showToast(msg){
+  var t=document.getElementById("cfgToast");
+  t.textContent=msg;
+  t.classList.add("show");
+  setTimeout(function(){t.classList.remove("show")},2000);
+}
 `;
 }
 var init_dashboard = __esm({
@@ -6648,7 +6819,27 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,san
 .log-st.Started{color:#f59e0b}
 .log-dur{color:#64748b;font-size:10px;margin-left:6px}
 .log-err{color:#ef4444;font-size:10px;margin-top:2px}
-.log-empty{color:#334155;text-align:center;padding:32px;font-size:12px}`;
+.log-empty{color:#334155;text-align:center;padding:32px;font-size:12px}
+
+/* Settings overlay */
+.cfg-overlay{display:none;position:fixed;top:0;right:0;width:440px;height:100vh;background:rgba(17,24,39,0.98);border-left:1px solid rgba(255,255,255,0.08);z-index:101;flex-direction:column;backdrop-filter:blur(12px)}
+.cfg-overlay.visible{display:flex}
+.cfg-hd{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between}
+.cfg-hd h2{color:#38bdf8;font-size:14px;font-weight:600}
+.cfg-hd .close{background:none;border:none;color:#64748b;cursor:pointer;font-size:20px;padding:0 4px;transition:color .15s}
+.cfg-hd .close:hover{color:#e5e7eb}
+.cfg-body{flex:1;overflow-y:auto;padding:16px 18px}
+.cfg-group{margin-bottom:14px}
+.cfg-group label{display:block;color:#94a3b8;font-size:11px;font-weight:500;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.cfg-group input,.cfg-group select{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);color:#e5e7eb;padding:8px 12px;border-radius:8px;font-size:13px;outline:none;transition:border-color .15s}
+.cfg-group input:focus,.cfg-group select:focus{border-color:rgba(56,189,248,0.5)}
+.cfg-group input::placeholder{color:#475569}
+.cfg-hint{color:#475569;font-size:10px;margin-top:3px}
+.cfg-actions{padding:14px 18px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:8px}
+.cfg-save{background:#38bdf8;color:#0b1020;border:1px solid #38bdf8;padding:8px 20px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.cfg-save:hover{background:#7dd3fc}
+.cfg-toast{position:fixed;bottom:24px;right:24px;background:#22c55e;color:#0b1020;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:500;z-index:200;opacity:0;transition:opacity .3s}
+.cfg-toast.show{opacity:1}`;
 }
 var init_css = __esm({
   "src/html/css.ts"() {
@@ -6674,7 +6865,7 @@ ${getDashboardCSS()}
 <body>
 <div class="app">
 <div class="sidebar">
-  <div class="sidebar-hd"><h1>codesense</h1><span id="uptime">${uptime}</span></div>
+  <div class="sidebar-hd"><h1>codesense</h1><div style="display:flex;gap:8px;align-items:center"><button class="btn" onclick="showSettings()" title="\u8BBE\u7F6E" style="font-size:14px;padding:2px 8px;cursor:pointer">&#9881;</button><span id="uptime">${uptime}</span></div></div>
   <div class="proj-list" id="projList">
     ${projects.map((p) => projItem(p)).join("\n    ")}
   </div>
@@ -6711,6 +6902,37 @@ ${getDashboardCSS()}
   </div>
   <div class="log-body" id="logBody"></div>
 </div>
+<div class="cfg-overlay" id="cfgPanel">
+  <div class="cfg-hd">
+    <h2>Embedding \u8BBE\u7F6E</h2>
+    <button class="close" onclick="document.getElementById('cfgPanel').classList.remove('visible')">&times;</button>
+  </div>
+  <div class="cfg-body">
+    <div class="cfg-group">
+      <label>Ollama URL</label>
+      <input type="text" id="cfgOllamaUrl" placeholder="http://localhost:11434" />
+    </div>
+    <div class="cfg-group">
+      <label>Model</label>
+      <input type="text" id="cfgModel" placeholder="qwen3-embedding:0.6b" />
+    </div>
+    <div class="cfg-group">
+      <label>Batch Size</label>
+      <input type="number" id="cfgBatchSize" min="1" max="100" placeholder="32" />
+      <div class="cfg-hint">\u6BCF\u6279\u5904\u7406\u7684\u6587\u672C\u6570\u91CF\u3002\u4F4E\u914D\u673A\u5668\u5EFA\u8BAE 5-10</div>
+    </div>
+    <div class="cfg-group">
+      <label>Batch Delay (ms)</label>
+      <input type="number" id="cfgBatchDelay" min="0" max="10000" step="50" placeholder="0" />
+      <div class="cfg-hint">\u6279\u6B21\u95F4\u95F4\u9694\u3002\u4F4E\u914D\u673A\u5668\u5EFA\u8BAE 200-500ms</div>
+    </div>
+  </div>
+  <div class="cfg-actions">
+    <button class="cfg-save" onclick="saveSettings()">\u4FDD\u5B58</button>
+    <button class="btn" onclick="document.getElementById('cfgPanel').classList.remove('visible')">\u53D6\u6D88</button>
+  </div>
+</div>
+<div class="cfg-toast" id="cfgToast"></div>
 <script src="https://unpkg.com/graphology@0.25.4/dist/graphology.umd.min.js"></script>
 <script src="https://unpkg.com/sigma@2.4.0/build/sigma.min.js"></script>
 <script>
@@ -6774,7 +6996,7 @@ async function startServer(options) {
   for (const p of projects) {
     initProjectState(state, p.name, p.path);
   }
-  const server = http.createServer(
+  const server = http2.createServer(
     (req, res) => handleRequest(req, res, state)
   );
   const shutdown = () => {
@@ -6875,7 +7097,7 @@ async function handleRequest(req, res, state) {
   const url = new import_url.URL(req.url || "/", `http://localhost:${state.port}`);
   const pathname = url.pathname;
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") {
     res.writeHead(204);
@@ -6911,6 +7133,10 @@ async function handleRequest(req, res, state) {
       handleSSE(req, res);
     } else if (pathname === "/api/notify" && req.method === "POST") {
       handleNotify(req, res, state);
+    } else if (pathname === "/api/settings" && req.method === "GET") {
+      serveSettings(res);
+    } else if (pathname === "/api/settings" && req.method === "PUT") {
+      updateSettings(req, res);
     } else {
       sendJSON(res, 404, { ok: false, error: "Not Found" });
     }
@@ -6932,7 +7158,7 @@ async function serveProjects(res) {
     projects.map(async (p) => {
       const projectDir = getProjectDir(p.name);
       const config = loadConfig(p.name);
-      const stats = await getTableStats(path11.join(projectDir, "index.lance"));
+      const stats = await getTableStats(path12.join(projectDir, "index.lance"));
       return {
         name: p.name,
         path: p.path,
@@ -6952,7 +7178,7 @@ async function serveProjectDetail(res, name) {
     return;
   }
   const config = loadConfig(name);
-  const stats = await getTableStats(path11.join(projectDir, "index.lance"));
+  const stats = await getTableStats(path12.join(projectDir, "index.lance"));
   const { nodeCount: depCount, edgeCount } = dbGetDepStats(name);
   sendJSON(res, 200, {
     ok: true,
@@ -7095,17 +7321,59 @@ function handleSSE(req, res) {
     sseClients.delete(res);
   });
 }
+function serveSettings(res) {
+  const config = dbLoadGlobalConfig();
+  sendJSON(res, 200, {
+    ok: true,
+    data: {
+      ollamaUrl: config.ollamaUrl,
+      model: config.model,
+      batchSize: config.batchSize,
+      batchDelay: config.batchDelay
+    }
+  });
+}
+function updateSettings(req, res) {
+  let body = "";
+  req.on("data", (chunk) => {
+    body += chunk.toString();
+  });
+  req.on("end", () => {
+    try {
+      const updates = JSON.parse(body);
+      const current = dbLoadGlobalConfig();
+      const newConfig = {
+        model: updates.model || current.model,
+        ollamaUrl: updates.ollamaUrl || current.ollamaUrl,
+        batchSize: typeof updates.batchSize === "number" ? updates.batchSize : current.batchSize,
+        batchDelay: typeof updates.batchDelay === "number" ? updates.batchDelay : current.batchDelay
+      };
+      if (newConfig.batchSize < 1 || newConfig.batchSize > 100) {
+        sendJSON(res, 400, { ok: false, error: "batchSize \u5FC5\u987B\u5728 1-100 \u4E4B\u95F4" });
+        return;
+      }
+      if (newConfig.batchDelay < 0 || newConfig.batchDelay > 1e4) {
+        sendJSON(res, 400, { ok: false, error: "batchDelay \u5FC5\u987B\u5728 0-10000ms \u4E4B\u95F4" });
+        return;
+      }
+      dbSaveGlobalConfig(newConfig);
+      sendJSON(res, 200, { ok: true });
+    } catch {
+      sendJSON(res, 400, { ok: false, error: "Invalid JSON" });
+    }
+  });
+}
 function sendJSON(res, statusCode, data) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(data));
 }
-var http, fs11, path11, import_url, sseClients;
+var http2, fs11, path12, import_url, sseClients;
 var init_server = __esm({
   "src/server.ts"() {
     "use strict";
-    http = __toESM(require("http"));
+    http2 = __toESM(require("http"));
     fs11 = __toESM(require("fs"));
-    path11 = __toESM(require("path"));
+    path12 = __toESM(require("path"));
     import_url = require("url");
     init_server_state();
     init_html();
@@ -7178,12 +7446,17 @@ function register2(program3) {
 
 // scripts/index_cmd.ts
 function register3(program3) {
-  program3.command("index").description("\u4E3A\u6307\u5B9A\u76EE\u5F55\u5EFA\u7ACB\u8BED\u4E49\u7D22\u5F15").argument("[path]", "\u76EE\u6807\u76EE\u5F55", ".").option("--strategy <strategy>", "\u7EF4\u5EA6\u7B56\u7565: auto | quality | performance", "auto").option("--background", "\u540E\u53F0\u6A21\u5F0F\u6784\u5EFA\u7D22\u5F15\uFF08\u5927\u578B\u9879\u76EE\uFF09").action(async (dir, options) => {
-    const { buildIndex: buildIndex2 } = await (init_indexer(), __toCommonJS(indexer_exports));
-    const { notifyServer: notifyServer2 } = await (init_notify(), __toCommonJS(notify_exports));
+  program3.command("index").description("\u4E3A\u6307\u5B9A\u76EE\u5F55\u5EFA\u7ACB\u8BED\u4E49\u7D22\u5F15").argument("[path]", "\u76EE\u6807\u76EE\u5F55", ".").option("--strategy <strategy>", "\u7EF4\u5EA6\u7B56\u7565: auto | quality | performance", "auto").option("--local", "\u5F3A\u5236\u672C\u5730\u6267\u884C\uFF0C\u4E0D\u8F6C\u53D1\u7ED9 server").action(async (dir, options) => {
     const { resolveProjectName: resolveProjectName2 } = await (init_global(), __toCommonJS(global_exports));
     const absDir = require("path").resolve(dir);
     const name = resolveProjectName2(absDir);
+    if (!options.local) {
+      const { forwardToServer: forwardToServer2 } = await (init_forward(), __toCommonJS(forward_exports));
+      const forwarded = await forwardToServer2("index", name);
+      if (forwarded) return;
+    }
+    const { buildIndex: buildIndex2 } = await (init_indexer(), __toCommonJS(indexer_exports));
+    const { notifyServer: notifyServer2 } = await (init_notify(), __toCommonJS(notify_exports));
     await notifyServer2("index-started", { name });
     const start = Date.now();
     try {
@@ -7236,12 +7509,17 @@ function register5(program3) {
 
 // scripts/update.ts
 function register6(program3) {
-  program3.command("update").description("\u589E\u91CF\u66F4\u65B0\u7D22\u5F15\uFF08\u81EA\u52A8\u68C0\u6D4B git \u53D8\u66F4\u6587\u4EF6\uFF09").option("-q, --quiet", "\u9759\u9ED8\u6A21\u5F0F").action(async (options) => {
-    const { updateIndex: updateIndex2 } = await (init_update(), __toCommonJS(update_exports));
-    const { notifyServer: notifyServer2 } = await (init_notify(), __toCommonJS(notify_exports));
+  program3.command("update").description("\u589E\u91CF\u66F4\u65B0\u7D22\u5F15\uFF08\u81EA\u52A8\u68C0\u6D4B git \u53D8\u66F4\u6587\u4EF6\uFF09").option("-q, --quiet", "\u9759\u9ED8\u6A21\u5F0F").option("--local", "\u5F3A\u5236\u672C\u5730\u6267\u884C\uFF0C\u4E0D\u8F6C\u53D1\u7ED9 server").action(async (options) => {
     const { resolveProjectName: resolveProjectName2 } = await (init_global(), __toCommonJS(global_exports));
     const absDir = require("path").resolve(".");
     const name = resolveProjectName2(absDir);
+    if (!options.local && !options.quiet) {
+      const { forwardToServer: forwardToServer2 } = await (init_forward(), __toCommonJS(forward_exports));
+      const forwarded = await forwardToServer2("update", name);
+      if (forwarded) return;
+    }
+    const { updateIndex: updateIndex2 } = await (init_update(), __toCommonJS(update_exports));
+    const { notifyServer: notifyServer2 } = await (init_notify(), __toCommonJS(notify_exports));
     await notifyServer2("update-started", { name });
     const start = Date.now();
     try {
@@ -7289,7 +7567,7 @@ function register9(program3) {
 }
 
 // src/cli.ts
-var VERSION = true ? "260429.155319" : "0.1.0-dev";
+var VERSION = true ? "260429.164126" : "0.1.0-dev";
 var program2 = new Command();
 program2.name("codesense").description("\u672C\u5730\u8BED\u4E49\u4EE3\u7801\u641C\u7D22 - \u901A\u8FC7\u5411\u91CF\u7D22\u5F15\u5B9A\u4F4D\u4EE3\u7801\u7247\u6BB5\uFF0C\u652F\u6301 AST \u4F9D\u8D56\u8FFD\u8E2A").version(VERSION);
 register(program2);
@@ -7318,11 +7596,11 @@ program2.command("chunk-test").description("\u6D4B\u8BD5 AST \u5206\u5757").argu
   const { chunkFile: chunkFile2 } = await (init_chunker(), __toCommonJS(chunker_exports));
   const { scanDirectory: scanDirectory2 } = await (init_file_scanner(), __toCommonJS(file_scanner_exports));
   const fs12 = await import("fs");
-  const path12 = await import("path");
+  const path13 = await import("path");
   const { EXT_TO_LANGUAGE: EXT_TO_LANGUAGE2 } = await (init_types(), __toCommonJS(types_exports));
   const stat = fs12.statSync(filePath);
   if (stat.isFile()) {
-    const ext = path12.extname(filePath);
+    const ext = path13.extname(filePath);
     const lang = EXT_TO_LANGUAGE2[ext] || "unknown";
     const content = fs12.readFileSync(filePath, "utf-8");
     const chunks = chunkFile2(filePath, content, lang);

@@ -23,11 +23,15 @@ export type Registry = Record<string, RegistryEntry>;
 export interface GlobalConfig {
   model: string;
   ollamaUrl: string;
+  batchSize: number;
+  batchDelay: number;
 }
 
 const DEFAULT_GLOBAL_CONFIG: GlobalConfig = {
   model: "qwen3-embedding:0.6b",
   ollamaUrl: "http://localhost:11434",
+  batchSize: 32,
+  batchDelay: 0,
 };
 
 export function getGlobalDir(): string {

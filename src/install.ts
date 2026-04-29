@@ -146,7 +146,7 @@ async function checkOrPullModel(): Promise<void> {
 function initializeDatabase(): void {
   ensureGlobalDir();
   getDb(); // 触发建库建表 + JSON 迁移
-  dbSaveGlobalConfig({ model: "qwen3-embedding:0.6b", ollamaUrl: "http://localhost:11434" });
+  dbSaveGlobalConfig({ model: "qwen3-embedding:0.6b", ollamaUrl: "http://localhost:11434", batchSize: 32, batchDelay: 0 });
   console.log("✓ 数据库已初始化 (~/.codesense/codesense.db)");
 }
 
@@ -360,5 +360,5 @@ export async function init(projectDir?: string): Promise<void> {
   integrateProject(absDir, projectName);
 
   console.log(`\n初始化完成！项目: ${projectName}`);
-  console.log(`  运行 \`codesense index ${absDir}\` 建立首次索引。`);
+  console.log(`  运行 \`codesense index ${absDir}\` 建立首次索引（自动后台执行）。`);
 }

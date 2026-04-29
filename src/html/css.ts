@@ -95,5 +95,25 @@ body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,san
 .log-st.Started{color:#f59e0b}
 .log-dur{color:#64748b;font-size:10px;margin-left:6px}
 .log-err{color:#ef4444;font-size:10px;margin-top:2px}
-.log-empty{color:#334155;text-align:center;padding:32px;font-size:12px}`;
+.log-empty{color:#334155;text-align:center;padding:32px;font-size:12px}
+
+/* Settings overlay */
+.cfg-overlay{display:none;position:fixed;top:0;right:0;width:440px;height:100vh;background:rgba(17,24,39,0.98);border-left:1px solid rgba(255,255,255,0.08);z-index:101;flex-direction:column;backdrop-filter:blur(12px)}
+.cfg-overlay.visible{display:flex}
+.cfg-hd{padding:14px 18px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:space-between}
+.cfg-hd h2{color:#38bdf8;font-size:14px;font-weight:600}
+.cfg-hd .close{background:none;border:none;color:#64748b;cursor:pointer;font-size:20px;padding:0 4px;transition:color .15s}
+.cfg-hd .close:hover{color:#e5e7eb}
+.cfg-body{flex:1;overflow-y:auto;padding:16px 18px}
+.cfg-group{margin-bottom:14px}
+.cfg-group label{display:block;color:#94a3b8;font-size:11px;font-weight:500;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
+.cfg-group input,.cfg-group select{width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);color:#e5e7eb;padding:8px 12px;border-radius:8px;font-size:13px;outline:none;transition:border-color .15s}
+.cfg-group input:focus,.cfg-group select:focus{border-color:rgba(56,189,248,0.5)}
+.cfg-group input::placeholder{color:#475569}
+.cfg-hint{color:#475569;font-size:10px;margin-top:3px}
+.cfg-actions{padding:14px 18px;border-top:1px solid rgba(255,255,255,0.06);display:flex;gap:8px}
+.cfg-save{background:#38bdf8;color:#0b1020;border:1px solid #38bdf8;padding:8px 20px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.cfg-save:hover{background:#7dd3fc}
+.cfg-toast{position:fixed;bottom:24px;right:24px;background:#22c55e;color:#0b1020;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:500;z-index:200;opacity:0;transition:opacity .3s}
+.cfg-toast.show{opacity:1}`;
 }

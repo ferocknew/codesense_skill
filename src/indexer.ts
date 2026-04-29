@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { CodeChunk, DepGraph, IndexConfig, DEFAULT_EXCLUDE_FILES } from "./types";
-import { OllamaEmbedder } from "./embedder";
+import { createEmbedderFromGlobalConfig } from "./embedder";
 import { chunkFile, buildEmbeddingInput } from "./chunker";
 import { scanDirectory } from "./file-scanner";
 import { createTable } from "./index";
@@ -62,7 +62,7 @@ export async function buildIndex(
   if (!quiet) console.log(`向量维度: ${dimensions} (策略: ${strategy}, chunks: ${allChunks.length})`);
 
   // 4. 检查 Ollama
-  const embedder = new OllamaEmbedder({ dimensions });
+  const embedder = createEmbedderFromGlobalConfig(dimensions);
   if (!quiet) process.stderr.write("检查 Ollama...\n");
   await embedder.ensureModel();
 
