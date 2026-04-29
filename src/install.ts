@@ -169,6 +169,40 @@ function integrateProject(absDir: string, projectName: string): void {
   checkUncommittedChanges(absDir);
 }
 
+const PROJECT_CONFIG_DIR = ".codesense";
+const PROJECT_CONFIG_FILE = "index.json";
+const DEFAULT_PROJECT_CONFIG = {
+  excludeFiles: ["SKILL.md", "README.md", "CLAUDE.md", "*.test.ts", "*.test.js", "*.spec.ts", "*.spec.js", "*.min.js", "*.min.css", "*.bundle.js"],
+  excludeDirs: [] as string[],
+};
+
+function checkProjectConfig(absDir: string): void {
+  const configDir = path.join(absDir, PROJECT_CONFIG_DIR);
+  const configPath = path.join(configDir, PROJECT_CONFIG_FILE);
+
+  if (fs.existsSync(configPath)) {
+    console.log("✓ 项目配置 .codesense/index.json 已存在");
+    return;
+  }
+
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+  }
+
+  fs.writeFileSync(configPath, JSON.stringify(DEFAULT_PROJECT_CONFIG, null, 2) + "\n", "utf-8");
+  console.log("✓ 已创建 .codesense/index.json（默认排除规则）");
+}
+
+export function loadProjectConfig(absDir: string): typeof DEFAULT_PROJECT_CONFIG | null {
+  const configPath = path.join(absDir, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE);
+  if (!fs.existsSync(configPath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
 function checkClaudeMd(absDir: string): void {
   const claudeMdPath = path.resolve(absDir, "CLAUDE.md");
   const injection = getClaudeMdInjection();

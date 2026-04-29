@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { EXCLUDE_DIRS, EXT_TO_LANGUAGE, TREE_SITTER_LANGUAGES } from "./types";
+import { loadProjectConfig } from "./install";
 
 export interface ScannedFile {
   filePath: string;
@@ -11,6 +12,9 @@ export interface ScannedFile {
 export function scanDirectory(dir: string, rootDir?: string): ScannedFile[] {
   const root = rootDir || dir;
   const gitignorePatterns = loadGitignore(root);
+  const projectConfig = loadProjectConfig(root);
+  const excludeFiles = projectConfig?.excludeFiles ?? [];
+  const excludeDirs = projectConfig?.excludeDirs ?? [];
   const results: ScannedFile[] = [];
 
   function walk(currentDir: string) {
@@ -29,10 +33,12 @@ export function scanDirectory(dir: string, rootDir?: string): ScannedFile[] {
 
       if (entry.isDirectory()) {
         if (EXCLUDE_DIRS.has(entry.name)) continue;
+        if (excludeDirs.some((d) => entry.name === d || relPath === d || relPath.startsWith(d + "/"))) continue;
         if (isIgnored(relPath, gitignorePatterns)) continue;
         walk(fullPath);
       } else if (entry.isFile()) {
         if (isIgnored(relPath, gitignorePatterns)) continue;
+        if (matchExcludePattern(relPath, excludeFiles)) continue;
         const ext = path.extname(entry.name).toLowerCase();
         const language = EXT_TO_LANGUAGE[ext];
         if (!language) continue;
