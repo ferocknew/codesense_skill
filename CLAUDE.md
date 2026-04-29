@@ -131,35 +131,42 @@ scripts/
 
 ## 变更记录
 
-### 2026-04-28 Bug 修复：跨文件追踪 + 搜索重复 + 幂等性
+### 2026-04-29 Dashboard 实时化 + hook 修复 + 项目配置
 
-**跨文件依赖追踪** (`src/graph.ts`)：
-- 新增 `buildTSImportMap()` — 解析 `import { foo } from './module'` 构建 localName→目标 nodeId 映射
-- `extractCallsFromBody()` 增加跨文件解析：本地 symbols 查不到时用 importMap 兜底
-- 依赖边 218→351（+133 跨文件边），`trace buildIndex` 从"无依赖"变为 62 个 callee
+**CLI → 服务器实时通知** (`src/notify.ts` + `src/server.ts`)：
+- 新增 `notifyServer(event, data)` — CLI 通过 HTTP POST 通知运行中的服务器
+- 新增 `POST /api/notify` 端点 — 接收通知后通过 SSE 即时广播前端
+- 事件类型：`project-registered/unregistered`、`index|update-started/progress/completed/failed`
+- 移除 30 秒轮询 `refreshProjects`，改为 CLI 主动通知，零延迟
+- `scripts/init.ts`、`uninstall.ts`、`index_cmd.ts`、`update.ts` 在关键节点调用 notifyServer
 
-**搜索结果去重** (`src/search.ts`)：
-- LanceDB update 累积重复记录（863→287），搜索返回同一 chunk 的多份拷贝
-- 修复：按 `(file, lineStart, symbol)` 去重，保留 score 最高的
+**Dashboard 进度条** (`src/html/index.ts` + `src/indexer.ts` + `src/embedder.ts`)：
+- embedder.embed 添加 `onProgress(current, total)` 回调
+- indexer.buildIndex 5 阶段进度：scanning → chunking → embedding → writing → deps
+- update.updateIndex 同样 5 阶段进度（通过 onProgress 回调）
+- 前端项目卡片底部显示带标签+百分比的进度条，SSE 监听实时更新
 
-**SearchResult 添加 language 字段** (`src/search.ts` + `src/types.ts`)：
-- 结果映射补充 `language` 字段，`-l` 过滤后可验证结果语言
+**git hook 修复** (`src/install.ts`)：
+- 异步执行：`nohup node skill.js update --quiet &` 替代同步调用，不阻塞 commit
+- husky 兼容：`checkGitHook` 检测 `core.hooksPath`，在 `.husky/post-commit`（而非 `.git/hooks/`）创建 hook
+- hook 自动升级：init 检测旧版同步 hook 时自动替换为 nohup 异步版本
 
-**update 幂等性** (`src/update.ts`)：
-- `git diff-tree HEAD` 总返回最后 commit 的文件，重复 update 重复处理
-- 修复：记录 `lastCommitHash` 到 `~/.codesense/projects/<name>/.last-commit`，相同则跳过
-- update 操作添加 `appendLog`，git hook 触发的 update 现在可查询日志
+**项目级排除配置** (`src/install.ts` + `src/file-scanner.ts`)：
+- init 生成 `.codesense/index.json`，含 `excludeFiles`（test/spec/min 等）和 `excludeDirs`
+- scanner 在扫描阶段直接跳过匹配文件，不进入索引
+- `loadProjectConfig()` 导出供其他模块使用
 
 **注意**：
-- `buildTSImportMap` 只处理命名导入（`import { foo }`），不处理 `import * as` 和 `require()`
-- 跨文件解析默认 `.ts` 扩展名，`.tsx`/`.js` 可能产生不匹配的 nodeId
 - 修改 `src/html/index.ts` 后需 `node build.js` + 重启服务器才能生效
+- husky 项目必须重新 init 更新 hook（旧 hook 在 `.git/hooks/` 不生效）
 
-### 2026-04-28 前期改造（摘要）
+### 2026-04-28 Bug 修复 + 全局化改造
 
-- **全局化**：`~/.codesense/` 全局目录、SQLite 元数据、`install→init`、`list`/`search --project`
-- **Dashboard**：布局重构（搜索框移至 toolbar）、知识图谱路径格式统一、符号详情修复
-- **AST 依赖**：tree-sitter 替换正则提取依赖、新增 `src/parser.ts` 共享解析器基础
-- **日志系统**：`src/logger.ts`，JSONL 文件日志，`/api/logs` 端点
+- **跨文件追踪**：`buildTSImportMap()` 解析 import 构建跨文件映射，依赖边 218→351
+- **搜索去重**：按 `(file, lineStart, symbol)` 去重，修复 LanceDB 重复记录
+- **update 幂等**：记录 `lastCommitHash`，相同 commit 跳过
+- **全局化**：`~/.codesense/` 全局目录、SQLite 元数据、`list`/`search --project`
+- **AST 依赖**：tree-sitter 替换正则提取、`src/parser.ts` 共享解析器
+- **日志**：`src/logger.ts`，JSONL 文件日志，`/api/logs` 端点
 - **搜索黑名单**：默认排除 SKILL.md/README.md/CLAUDE.md
 

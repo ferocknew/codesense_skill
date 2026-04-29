@@ -250,18 +250,34 @@ function checkGitHook(absDir: string): void {
     }
   }
 
-  const hookDir = path.join(gitDir, "hooks");
-  const hookPath = path.join(hookDir, "post-commit");
   const skillCmd = getSkillCommand();
-  const hookContent = `${HOOK_MARKER}\n(${skillCmd} update --quiet </dev/null >/dev/null 2>&1 &) || true`;
+  const hookCmd = `nohup ${skillCmd} update --quiet </dev/null >/dev/null 2>&1 &`;
 
-  if (!fs.existsSync(hookDir)) {
-    fs.mkdirSync(hookDir, { recursive: true });
+  // 检测是否使用 husky（core.hooksPath 指向 .husky/_）
+  let hooksPath: string | null = null;
+  try {
+    const hp = execSync("git config core.hooksPath", { cwd: absDir, encoding: "utf-8", timeout: 3000 }).trim();
+    if (hp) hooksPath = hp;
+  } catch {}
+
+  if (hooksPath) {
+    // husky 模式：在 .husky/ 根目录创建 post-commit
+    const huskyDir = path.resolve(absDir, hooksPath, "..");
+    const huskyHook = path.join(huskyDir, "post-commit");
+    writeOrUpdateHook(huskyHook, skillCmd, hookCmd);
+  } else {
+    // 标准 git hook
+    const hookDir = path.join(gitDir, "hooks");
+    if (!fs.existsSync(hookDir)) fs.mkdirSync(hookDir, { recursive: true });
+    writeOrUpdateHook(path.join(hookDir, "post-commit"), skillCmd, hookCmd);
   }
+}
+
+function writeOrUpdateHook(hookPath: string, skillCmd: string, hookCmd: string): void {
+  const hookContent = `#!/bin/sh\n${HOOK_MARKER}\n${hookCmd}\n`;
 
   if (!fs.existsSync(hookPath)) {
-    // hook 不存在 → 创建
-    fs.writeFileSync(hookPath, `#!/bin/sh\n${hookContent}\n`, "utf-8");
+    fs.writeFileSync(hookPath, hookContent, "utf-8");
     fs.chmodSync(hookPath, 0o755);
     console.log("✓ 已创建 post-commit hook（codesense 自动更新）");
     return;
@@ -269,13 +285,24 @@ function checkGitHook(absDir: string): void {
 
   const content = fs.readFileSync(hookPath, "utf-8");
   if (!content.includes(HOOK_MARKER)) {
-    // hook 存在但没有 codesense → 追加
-    fs.writeFileSync(hookPath, content + "\n" + hookContent + "\n", "utf-8");
+    fs.writeFileSync(hookPath, content + "\n" + HOOK_MARKER + "\n" + hookCmd + "\n", "utf-8");
     console.log("✓ 已向 post-commit hook 追加 codesense 更新");
     return;
   }
 
-  // marker 存在，检查可执行权限
+  // marker 存在，检查命令行是否需要更新
+  const lines = content.split("\n");
+  const markerIdx = lines.findIndex((l) => l.includes(HOOK_MARKER));
+  if (markerIdx >= 0 && markerIdx + 1 < lines.length) {
+    const cmdLine = lines[markerIdx + 1];
+    if (cmdLine.includes(skillCmd) && cmdLine.trim() !== hookCmd) {
+      lines[markerIdx + 1] = hookCmd;
+      fs.writeFileSync(hookPath, lines.join("\n"), "utf-8");
+      console.log("✓ post-commit hook 已更新（异步模式）");
+      return;
+    }
+  }
+
   try {
     fs.accessSync(hookPath, fs.constants.X_OK);
     console.log("✓ post-commit hook 正常");

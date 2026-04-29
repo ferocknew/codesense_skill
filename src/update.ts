@@ -89,6 +89,8 @@ async function updateByFiles(
   }
 
   if (!quiet) console.log(`处理 ${changedFiles.length} 个变更文件...`);
+  const onProgress = options.onProgress;
+  onProgress?.("scanning", changedFiles.length, changedFiles.length);
 
   const dbPath = path.join(outDir, "index.lance");
   const embedder = new OllamaEmbedder({ dimensions: config.dimensions });
@@ -137,6 +139,7 @@ async function updateByFiles(
         if (!quiet) process.stderr.write(`  跳过 ${relPath}: ${e.message}\n`);
       }
     }
+    onProgress?.("chunking", allChunks.length, allChunks.length);
 
     if (allChunks.length > 0) {
       if (!quiet) process.stderr.write(`处理 ${allChunks.length} 个代码块...\n`);
@@ -159,9 +162,11 @@ async function updateByFiles(
       }));
 
       await addToTable(dbPath, records);
+      onProgress?.("writing", records.length, records.length);
     }
 
     // 更新依赖图
+    onProgress?.("deps", 0, processable.length);
     for (const { absPath, relPath, language } of processable) {
       try {
         const content = fs.readFileSync(absPath, "utf-8");
@@ -170,6 +175,7 @@ async function updateByFiles(
         dbMergeDepGraph(projectName, fileGraph);
       } catch {}
     }
+    onProgress?.("deps", processable.length, processable.length);
   }
 
   // 增量更新 manifest
