@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// codesense - 本地语义代码搜索 v260429.133357
+// codesense - 本地语义代码搜索 v260429.155319
 
 "use strict";
 var __create = Object.create;
@@ -3747,7 +3747,7 @@ function findPackageManager() {
   return { cmd: "", name: "" };
 }
 function installDependencies() {
-  const skillDir = path3.resolve(__dirname, "..");
+  const skillDir = __dirname;
   const nodeModules = path3.join(skillDir, "node_modules");
   if (fs3.existsSync(nodeModules)) {
     console.log("\u2713 \u4F9D\u8D56\u5DF2\u5B89\u88C5");
@@ -7289,7 +7289,7 @@ function register9(program3) {
 }
 
 // src/cli.ts
-var VERSION = true ? "260429.133357" : "0.1.0-dev";
+var VERSION = true ? "260429.155319" : "0.1.0-dev";
 var program2 = new Command();
 program2.name("codesense").description("\u672C\u5730\u8BED\u4E49\u4EE3\u7801\u641C\u7D22 - \u901A\u8FC7\u5411\u91CF\u7D22\u5F15\u5B9A\u4F4D\u4EE3\u7801\u7247\u6BB5\uFF0C\u652F\u6301 AST \u4F9D\u8D56\u8FFD\u8E2A").version(VERSION);
 register(program2);
