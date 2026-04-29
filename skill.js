@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// codesense - 本地语义代码搜索 v260429.173849
+// codesense - 本地语义代码搜索 v260429.174438
 
 "use strict";
 var __create = Object.create;
@@ -3936,7 +3936,7 @@ async function checkOrPullModel() {
 function initializeDatabase2() {
   ensureGlobalDir();
   getDb();
-  dbSaveGlobalConfig({ model: "qwen3-embedding:0.6b", ollamaUrl: "http://localhost:11434", batchSize: 32, batchDelay: 0 });
+  dbSaveGlobalConfig({ model: "qwen3-embedding:0.6b", ollamaUrl: "http://localhost:11434", batchSize: 16, batchDelay: 200 });
   console.log("\u2713 \u6570\u636E\u5E93\u5DF2\u521D\u59CB\u5316 (~/.codesense/codesense.db)");
 }
 function integrateProject(absDir, projectName) {
@@ -7607,7 +7607,7 @@ function register10(program3) {
 }
 
 // src/cli.ts
-var VERSION = true ? "260429.173849" : "0.1.0-dev";
+var VERSION = true ? "260429.174438" : "0.1.0-dev";
 var program2 = new Command();
 program2.name("codesense").description("\u672C\u5730\u8BED\u4E49\u4EE3\u7801\u641C\u7D22 - \u901A\u8FC7\u5411\u91CF\u7D22\u5F15\u5B9A\u4F4D\u4EE3\u7801\u7247\u6BB5\uFF0C\u652F\u6301 AST \u4F9D\u8D56\u8FFD\u8E2A").version(VERSION);
 register(program2);

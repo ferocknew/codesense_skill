@@ -147,7 +147,7 @@ async function checkOrPullModel(): Promise<void> {
 function initializeDatabase(): void {
   ensureGlobalDir();
   getDb(); // 触发建库建表 + JSON 迁移
-  dbSaveGlobalConfig({ model: "qwen3-embedding:0.6b", ollamaUrl: "http://localhost:11434", batchSize: 32, batchDelay: 0 });
+  dbSaveGlobalConfig({ model: "qwen3-embedding:0.6b", ollamaUrl: "http://localhost:11434", batchSize: 16, batchDelay: 200 });
   console.log("✓ 数据库已初始化 (~/.codesense/codesense.db)");
 }
 
