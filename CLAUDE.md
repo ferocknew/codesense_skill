@@ -2,20 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-
-<!-- codesense-start -->
-## codesense
-
-本项目有 codesense 语义代码索引。
-
-Rules:
-- 回答"这段代码在哪"、"怎么实现 X"类问题时，先运行 `node "/Volumes/1T_M2/Downloads/code/codesense_skill/skill.js" search "<问题描述>"`
-- 需要理解调用链、影响范围时，运行 `node "/Volumes/1T_M2/Downloads/code/codesense_skill/skill.js" trace "<符号名>"`
-- 修改代码后，运行 `node "/Volumes/1T_M2/Downloads/code/codesense_skill/skill.js" update` 增量更新（如已安装 hook 则自动触发）
-- 搜索返回的是 chunk 级结果，仍需读取源文件确认完整上下文
-<!-- codesense-end -->
-
-
 ## 项目简介
 
 **codesense** 是一个 Claude Code skill，为本地代码库建立向量语义索引，让 Claude 能通过语义搜索精准定位代码片段。Node.js/TypeScript 实现，依赖 Ollama 本地 embedding（零 API 成本）。
@@ -221,3 +207,15 @@ This project is indexed by GitNexus as **codesense_skill** (881 symbols, 1737 re
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+<!-- codesense-start -->
+## codesense
+
+本项目有 codesense 语义代码索引。
+
+Rules:
+- 回答"这段代码在哪"、"怎么实现 X"类问题时，先运行 `node "/Volumes/1T_M2/Downloads/code/codesense_skill/skill.js" search "<问题描述>"`
+- 需要理解调用链、影响范围时，运行 `node "/Volumes/1T_M2/Downloads/code/codesense_skill/skill.js" trace "<符号名>"`
+- 修改代码后，运行 `node "/Volumes/1T_M2/Downloads/code/codesense_skill/skill.js" update` 增量更新（如已安装 hook 则自动触发）
+- 搜索返回的是 chunk 级结果，仍需读取源文件确认完整上下文
+<!-- codesense-end -->

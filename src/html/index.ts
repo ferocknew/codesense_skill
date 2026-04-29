@@ -40,6 +40,7 @@ ${getDashboardCSS()}
   </div>
   <div class="search-results" id="searchResults"></div>
   <div class="graph-wrap">
+    <div class="topbar" id="topbar">Nodes: <span id="nodeCount">0</span></div>
     <div class="placeholder" id="ph">Click a project in the sidebar to view its dependency graph</div>
     <div id="graph"></div>
   </div>
@@ -56,7 +57,8 @@ ${getDashboardCSS()}
   </div>
   <div class="log-body" id="logBody"></div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<script src="https://unpkg.com/graphology@0.25.4/dist/graphology.umd.min.js"></script>
+<script src="https://unpkg.com/sigma@2.4.0/build/sigma.min.js"></script>
 <script>
 ${getDashboardJS()}
 </script>

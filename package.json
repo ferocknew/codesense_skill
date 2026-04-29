@@ -12,11 +12,15 @@
     "esbuild": "^0.24.0",
     "typescript": "^5.7.0"
   },
-  "onlyBuiltDependencies": ["better-sqlite3"],
+  "onlyBuiltDependencies": [
+    "better-sqlite3"
+  ],
   "dependencies": {
     "@lancedb/lancedb": "^0.18.0",
     "better-sqlite3": "^12.9.0",
     "commander": "^12.0.0",
+    "graphology-layout": "^0.6.1",
+    "graphology-layout-forceatlas2": "^0.10.1",
     "tree-sitter": "^0.21.0",
     "tree-sitter-c": "^0.23.0",
     "tree-sitter-cpp": "^0.23.0",
