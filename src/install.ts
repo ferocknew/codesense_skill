@@ -3,6 +3,7 @@ import * as path from "path";
 import { execSync } from "child_process";
 import { OllamaEmbedder } from "./embedder";
 import { ensureGlobalDir, registerProject, resolveProjectName } from "./global";
+import { loadConfig } from "./config";
 import { getDb, dbSaveGlobalConfig } from "./database";
 
 export const CLAUDE_MD_MARKER = "<!-- codesense-start -->";
@@ -360,5 +361,10 @@ export async function init(projectDir?: string): Promise<void> {
   integrateProject(absDir, projectName);
 
   console.log(`\n初始化完成！项目: ${projectName}`);
-  console.log(`  运行 \`codesense index ${absDir}\` 建立首次索引（自动后台执行）。`);
+  const existingConfig = loadConfig(projectName);
+  if (existingConfig) {
+    console.log(`  索引已存在（${existingConfig.updatedAt}），无需重建。`);
+  } else {
+    console.log(`  运行 \`codesense index ${absDir}\` 建立首次索引（自动后台执行）。`);
+  }
 }

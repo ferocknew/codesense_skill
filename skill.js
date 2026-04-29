@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// codesense - 本地语义代码搜索 v260429.165025
+// codesense - 本地语义代码搜索 v260429.173849
 
 "use strict";
 var __create = Object.create;
@@ -3056,8 +3056,8 @@ var init_types = __esm({
       model: "qwen3-embedding:0.6b",
       dimensions: 1024,
       dimensionsFull: 2048,
-      batchSize: 32,
-      batchDelay: 0
+      batchSize: 16,
+      batchDelay: 200
     };
     EXCLUDE_DIRS = /* @__PURE__ */ new Set([
       ".git",
@@ -3722,6 +3722,95 @@ var init_global = __esm({
   }
 });
 
+// src/config.ts
+var config_exports = {};
+__export(config_exports, {
+  ensureProjectOutputDir: () => ensureProjectOutputDir,
+  getProjectOutputDir: () => getProjectOutputDir,
+  loadConfig: () => loadConfig,
+  resolveDimensions: () => resolveDimensions,
+  saveConfig: () => saveConfig,
+  showStatus: () => showStatus
+});
+function resolveDimensions(_chunkCount, strategy) {
+  switch (strategy) {
+    case "quality":
+      return 1024;
+    case "performance":
+      return 1024;
+    case "auto":
+    default:
+      return 1024;
+  }
+}
+function loadConfig(projectName) {
+  return dbLoadConfig(projectName);
+}
+function saveConfig(projectName, config) {
+  dbSaveConfig(projectName, config);
+}
+function getProjectOutputDir(projectName) {
+  return getProjectDir(projectName);
+}
+function ensureProjectOutputDir(projectName) {
+  return ensureProjectDir(projectName);
+}
+async function showStatus(projectName) {
+  if (projectName) {
+    showProjectStatus(projectName);
+    return;
+  }
+  const entry = findProjectByDir(".");
+  if (entry) {
+    showProjectStatus(entry.name);
+    return;
+  }
+  const projects = listProjects();
+  if (projects.length === 0) {
+    console.log("\u6CA1\u6709\u5DF2\u6CE8\u518C\u7684\u9879\u76EE\u3002\u8FD0\u884C `codesense init` \u521D\u59CB\u5316\u3002");
+    return;
+  }
+  console.log("codesense \u5168\u5C40\u72B6\u6001:");
+  console.log(`  \u76EE\u5F55: ${getGlobalDir()}`);
+  console.log(`  \u5DF2\u6CE8\u518C\u9879\u76EE: ${projects.length}
+`);
+  for (const p of projects) {
+    console.log(`  ${p.name}`);
+    console.log(`    \u8DEF\u5F84: ${p.path}`);
+    const config = loadConfig(p.name);
+    if (config) {
+      console.log(`    \u6A21\u578B: ${config.model}  \u7EF4\u5EA6: ${config.dimensions}  \u66F4\u65B0: ${config.updatedAt}`);
+    } else {
+      console.log(`    (\u672A\u5EFA\u7D22\u5F15)`);
+    }
+  }
+}
+function showProjectStatus(projectName) {
+  const config = loadConfig(projectName);
+  if (!config) {
+    console.log(`\u9879\u76EE "${projectName}" \u672A\u5EFA\u7D22\u5F15\u3002\u8FD0\u884C \`codesense index <\u76EE\u5F55>\` \u5EFA\u7ACB\u7D22\u5F15\u3002`);
+    return;
+  }
+  console.log(`codesense \u7D22\u5F15\u72B6\u6001 [${projectName}]:`);
+  console.log(`  \u6A21\u578B:     ${config.model}`);
+  console.log(`  \u7EF4\u5EA6:     ${config.dimensions}`);
+  console.log(`  \u7B56\u7565:     ${config.strategy}`);
+  console.log(`  \u521B\u5EFA\u65F6\u95F4: ${config.createdAt}`);
+  console.log(`  \u66F4\u65B0\u65F6\u95F4: ${config.updatedAt}`);
+  const fileCount = dbGetManifestCount(projectName);
+  console.log(`  \u6587\u4EF6\u6570:   ${fileCount}`);
+  const { nodeCount, edgeCount } = dbGetDepStats(projectName);
+  console.log(`  \u4F9D\u8D56\u8282\u70B9: ${nodeCount}`);
+  console.log(`  \u4F9D\u8D56\u8FB9:   ${edgeCount}`);
+}
+var init_config = __esm({
+  "src/config.ts"() {
+    "use strict";
+    init_global();
+    init_database();
+  }
+});
+
 // src/install.ts
 var install_exports = {};
 __export(install_exports, {
@@ -4005,7 +4094,12 @@ async function init(projectDir) {
   integrateProject(absDir, projectName);
   console.log(`
 \u521D\u59CB\u5316\u5B8C\u6210\uFF01\u9879\u76EE: ${projectName}`);
-  console.log(`  \u8FD0\u884C \`codesense index ${absDir}\` \u5EFA\u7ACB\u9996\u6B21\u7D22\u5F15\uFF08\u81EA\u52A8\u540E\u53F0\u6267\u884C\uFF09\u3002`);
+  const existingConfig = loadConfig(projectName);
+  if (existingConfig) {
+    console.log(`  \u7D22\u5F15\u5DF2\u5B58\u5728\uFF08${existingConfig.updatedAt}\uFF09\uFF0C\u65E0\u9700\u91CD\u5EFA\u3002`);
+  } else {
+    console.log(`  \u8FD0\u884C \`codesense index ${absDir}\` \u5EFA\u7ACB\u9996\u6B21\u7D22\u5F15\uFF08\u81EA\u52A8\u540E\u53F0\u6267\u884C\uFF09\u3002`);
+  }
 }
 var fs3, path3, import_child_process, CLAUDE_MD_MARKER, CLAUDE_MD_END_MARKER, HOOK_MARKER, PROJECT_CONFIG_DIR, PROJECT_CONFIG_FILE, DEFAULT_PROJECT_CONFIG;
 var init_install = __esm({
@@ -4016,6 +4110,7 @@ var init_install = __esm({
     import_child_process = require("child_process");
     init_embedder();
     init_global();
+    init_config();
     init_database();
     CLAUDE_MD_MARKER = "<!-- codesense-start -->";
     CLAUDE_MD_END_MARKER = "<!-- codesense-end -->";
@@ -4051,95 +4146,6 @@ var init_notify = __esm({
   "src/notify.ts"() {
     "use strict";
     DEFAULT_PORT = 54321;
-  }
-});
-
-// src/config.ts
-var config_exports = {};
-__export(config_exports, {
-  ensureProjectOutputDir: () => ensureProjectOutputDir,
-  getProjectOutputDir: () => getProjectOutputDir,
-  loadConfig: () => loadConfig,
-  resolveDimensions: () => resolveDimensions,
-  saveConfig: () => saveConfig,
-  showStatus: () => showStatus
-});
-function resolveDimensions(_chunkCount, strategy) {
-  switch (strategy) {
-    case "quality":
-      return 1024;
-    case "performance":
-      return 1024;
-    case "auto":
-    default:
-      return 1024;
-  }
-}
-function loadConfig(projectName) {
-  return dbLoadConfig(projectName);
-}
-function saveConfig(projectName, config) {
-  dbSaveConfig(projectName, config);
-}
-function getProjectOutputDir(projectName) {
-  return getProjectDir(projectName);
-}
-function ensureProjectOutputDir(projectName) {
-  return ensureProjectDir(projectName);
-}
-async function showStatus(projectName) {
-  if (projectName) {
-    showProjectStatus(projectName);
-    return;
-  }
-  const entry = findProjectByDir(".");
-  if (entry) {
-    showProjectStatus(entry.name);
-    return;
-  }
-  const projects = listProjects();
-  if (projects.length === 0) {
-    console.log("\u6CA1\u6709\u5DF2\u6CE8\u518C\u7684\u9879\u76EE\u3002\u8FD0\u884C `codesense init` \u521D\u59CB\u5316\u3002");
-    return;
-  }
-  console.log("codesense \u5168\u5C40\u72B6\u6001:");
-  console.log(`  \u76EE\u5F55: ${getGlobalDir()}`);
-  console.log(`  \u5DF2\u6CE8\u518C\u9879\u76EE: ${projects.length}
-`);
-  for (const p of projects) {
-    console.log(`  ${p.name}`);
-    console.log(`    \u8DEF\u5F84: ${p.path}`);
-    const config = loadConfig(p.name);
-    if (config) {
-      console.log(`    \u6A21\u578B: ${config.model}  \u7EF4\u5EA6: ${config.dimensions}  \u66F4\u65B0: ${config.updatedAt}`);
-    } else {
-      console.log(`    (\u672A\u5EFA\u7D22\u5F15)`);
-    }
-  }
-}
-function showProjectStatus(projectName) {
-  const config = loadConfig(projectName);
-  if (!config) {
-    console.log(`\u9879\u76EE "${projectName}" \u672A\u5EFA\u7D22\u5F15\u3002\u8FD0\u884C \`codesense index <\u76EE\u5F55>\` \u5EFA\u7ACB\u7D22\u5F15\u3002`);
-    return;
-  }
-  console.log(`codesense \u7D22\u5F15\u72B6\u6001 [${projectName}]:`);
-  console.log(`  \u6A21\u578B:     ${config.model}`);
-  console.log(`  \u7EF4\u5EA6:     ${config.dimensions}`);
-  console.log(`  \u7B56\u7565:     ${config.strategy}`);
-  console.log(`  \u521B\u5EFA\u65F6\u95F4: ${config.createdAt}`);
-  console.log(`  \u66F4\u65B0\u65F6\u95F4: ${config.updatedAt}`);
-  const fileCount = dbGetManifestCount(projectName);
-  console.log(`  \u6587\u4EF6\u6570:   ${fileCount}`);
-  const { nodeCount, edgeCount } = dbGetDepStats(projectName);
-  console.log(`  \u4F9D\u8D56\u8282\u70B9: ${nodeCount}`);
-  console.log(`  \u4F9D\u8D56\u8FB9:   ${edgeCount}`);
-}
-var init_config = __esm({
-  "src/config.ts"() {
-    "use strict";
-    init_global();
-    init_database();
   }
 });
 
@@ -6154,18 +6160,12 @@ var init_update = __esm({
 // src/uninstall.ts
 var uninstall_exports = {};
 __export(uninstall_exports, {
+  clearProject: () => clearProject,
   uninstall: () => uninstall
 });
 async function uninstall(projectDir) {
   const absDir = path11.resolve(projectDir || ".");
   const projectName = resolveProjectName(absDir);
-  dbDeleteProjectData(projectName);
-  console.log(`\u2713 \u9879\u76EE "${projectName}" \u6570\u636E\u5DF2\u4ECE\u6570\u636E\u5E93\u79FB\u9664`);
-  const projectDataDir = getProjectDir(projectName);
-  if (fs10.existsSync(projectDataDir)) {
-    fs10.rmSync(projectDataDir, { recursive: true, force: true });
-    console.log(`\u2713 \u5DF2\u6E05\u7406\u7D22\u5F15\u6570\u636E: ${projectDataDir}`);
-  }
   const claudeMdPath = path11.resolve(absDir, "CLAUDE.md");
   if (fs10.existsSync(claudeMdPath)) {
     let content = fs10.readFileSync(claudeMdPath, "utf-8");
@@ -6219,6 +6219,23 @@ async function uninstall(projectDir) {
   }
   console.log(`
 codesense \u96C6\u6210\u5DF2\u5378\u8F7D\u3002\u9879\u76EE: ${projectName}`);
+  console.log(`  \u7D22\u5F15\u6570\u636E\u4FDD\u7559\uFF08re-init \u540E\u53EF\u76F4\u63A5\u4F7F\u7528\uFF09`);
+  console.log(`  \u5982\u9700\u5F7B\u5E95\u6E05\u9664\u7D22\u5F15: codesense clear ${absDir}`);
+}
+async function clearProject(projectDir) {
+  const absDir = path11.resolve(projectDir || ".");
+  const projectName = resolveProjectName(absDir);
+  dbDeleteProjectData(projectName);
+  console.log(`\u2713 \u9879\u76EE "${projectName}" \u6570\u636E\u5DF2\u4ECE\u6570\u636E\u5E93\u79FB\u9664`);
+  const projectDataDir = getProjectDir(projectName);
+  if (fs10.existsSync(projectDataDir)) {
+    fs10.rmSync(projectDataDir, { recursive: true, force: true });
+    console.log(`\u2713 \u5DF2\u6E05\u7406\u7D22\u5F15\u6570\u636E: ${projectDataDir}`);
+  } else {
+    console.log(`  \u65E0\u7D22\u5F15\u6570\u636E\u9700\u8981\u6E05\u7406`);
+  }
+  console.log(`
+\u7D22\u5F15\u6570\u636E\u5DF2\u6E05\u9664\u3002\u9879\u76EE: ${projectName}`);
 }
 var fs10, path11;
 var init_uninstall = __esm({
@@ -7568,8 +7585,21 @@ function register8(program3) {
   });
 }
 
-// scripts/server.ts
+// scripts/clear.ts
 function register9(program3) {
+  program3.command("clear").description("\u6E05\u9664\u9879\u76EE\u7684\u7D22\u5F15\u6570\u636E\uFF08\u4E0D\u5378\u8F7D\u96C6\u6210\uFF09").argument("[path]", "\u9879\u76EE\u76EE\u5F55", ".").action(async (projectDir) => {
+    const { clearProject: clearProject2 } = await (init_uninstall(), __toCommonJS(uninstall_exports));
+    const { notifyServer: notifyServer2 } = await (init_notify(), __toCommonJS(notify_exports));
+    const { resolveProjectName: resolveProjectName2 } = await (init_global(), __toCommonJS(global_exports));
+    const absDir = require("path").resolve(projectDir);
+    await clearProject2(projectDir);
+    const name = resolveProjectName2(absDir);
+    await notifyServer2("project-unregistered", { name });
+  });
+}
+
+// scripts/server.ts
+function register10(program3) {
   program3.command("server").description("\u542F\u52A8\u540E\u53F0 HTTP \u670D\u52A1\uFF08Web \u72B6\u6001\u9875 + \u77E5\u8BC6\u56FE\u8C31\u53EF\u89C6\u5316\uFF09").option("-p, --port <number>", "\u7AEF\u53E3\u53F7", "54321").action(async (options) => {
     const { startServer: startServer2 } = await (init_server(), __toCommonJS(server_exports));
     await startServer2({ port: parseInt(options.port, 10) });
@@ -7577,7 +7607,7 @@ function register9(program3) {
 }
 
 // src/cli.ts
-var VERSION = true ? "260429.165025" : "0.1.0-dev";
+var VERSION = true ? "260429.173849" : "0.1.0-dev";
 var program2 = new Command();
 program2.name("codesense").description("\u672C\u5730\u8BED\u4E49\u4EE3\u7801\u641C\u7D22 - \u901A\u8FC7\u5411\u91CF\u7D22\u5F15\u5B9A\u4F4D\u4EE3\u7801\u7247\u6BB5\uFF0C\u652F\u6301 AST \u4F9D\u8D56\u8FFD\u8E2A").version(VERSION);
 register(program2);
@@ -7589,6 +7619,7 @@ register6(program2);
 register7(program2);
 register8(program2);
 register9(program2);
+register10(program2);
 program2.command("embed-test").description("\u6D4B\u8BD5 embedding \u8FDE\u63A5").argument("<text>", "\u6D4B\u8BD5\u6587\u672C").action(async (text) => {
   const { OllamaEmbedder: OllamaEmbedder2 } = await (init_embedder(), __toCommonJS(embedder_exports));
   const embedder = new OllamaEmbedder2();

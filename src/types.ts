@@ -94,8 +94,8 @@ export const DEFAULT_EMBEDDING_CONFIG: EmbeddingConfig = {
   model: "qwen3-embedding:0.6b",
   dimensions: 1024,
   dimensionsFull: 2048,
-  batchSize: 32,
-  batchDelay: 0,
+  batchSize: 16,
+  batchDelay: 200,
 };
 
 export const EXCLUDE_DIRS = new Set([

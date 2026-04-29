@@ -78,7 +78,8 @@ scripts/
 ├── forward.ts      # Server 检测与转发（ensureServer + forwardToServer）
 ├── status.ts       # status 命令注册
 ├── server.ts       # server 命令注册（--port）
-└── uninstall.ts    # uninstall 命令注册
+├── clear.ts        # clear 命令注册（清除索引数据）
+└── uninstall.ts    # uninstall 命令注册（只移除集成，不删索引）
 ```
 
 ## 核心架构
@@ -136,9 +137,12 @@ scripts/
 - `index`/`update` 命令先尝试转发 server，不可达才本地执行兜底
 - 新增 `--local` 参数强制本地执行
 
-**Bug 修复**：
+**Bug 修复 + 行为优化**：
 - `install.ts` 的 `installDependencies()` 路径错误：`path.resolve(__dirname, "..")` 在打包后多跳一级，改为 `__dirname`
 - 页面刷新后进度条消失：初始化时从 `/api/status` 恢复 `indexing` 状态的项目进度条
+- `uninstall` 不再删除索引数据：只移除 CLAUDE.md 注入 + git hook，索引保留供 re-init 复用
+- 新增 `clear` 命令：彻底删除索引数据（原 uninstall 的删除行为）
+- `init` 检测已有索引：有则提示"索引已存在，无需重建"
 - `skill.js` 已加入 git 跟踪（`.gitignore` 已移除排除）
 
 ### 2026-04-29 Dashboard 图谱重构 + 实时化 + 全局化

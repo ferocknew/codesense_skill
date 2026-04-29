@@ -8,18 +8,8 @@ export async function uninstall(projectDir?: string): Promise<void> {
   const absDir = path.resolve(projectDir || ".");
   const projectName = resolveProjectName(absDir);
 
-  // Step 1: 从 registry 移除项目（CASCADE 删除所有项目数据）
-  dbDeleteProjectData(projectName);
-  console.log(`✓ 项目 "${projectName}" 数据已从数据库移除`);
-
-  // Step 2: 清理 LanceDB 索引目录
-  const projectDataDir = getProjectDir(projectName);
-  if (fs.existsSync(projectDataDir)) {
-    fs.rmSync(projectDataDir, { recursive: true, force: true });
-    console.log(`✓ 已清理索引数据: ${projectDataDir}`);
-  }
-
-  // Step 3: 移除 CLAUDE.md 中的 codesense 段落
+  // 只移除集成（CLAUDE.md + hook），不删除数据库和索引数据
+  // Step 1: 移除 CLAUDE.md 中的 codesense 段落
   const claudeMdPath = path.resolve(absDir, "CLAUDE.md");
   if (fs.existsSync(claudeMdPath)) {
     let content = fs.readFileSync(claudeMdPath, "utf-8");
@@ -76,4 +66,26 @@ export async function uninstall(projectDir?: string): Promise<void> {
   }
 
   console.log(`\ncodesense 集成已卸载。项目: ${projectName}`);
+  console.log(`  索引数据保留（re-init 后可直接使用）`);
+  console.log(`  如需彻底清除索引: codesense clear ${absDir}`);
+}
+
+export async function clearProject(projectDir?: string): Promise<void> {
+  const absDir = path.resolve(projectDir || ".");
+  const projectName = resolveProjectName(absDir);
+
+  // 删除数据库中的项目数据（CASCADE）
+  dbDeleteProjectData(projectName);
+  console.log(`✓ 项目 "${projectName}" 数据已从数据库移除`);
+
+  // 删除索引目录
+  const projectDataDir = getProjectDir(projectName);
+  if (fs.existsSync(projectDataDir)) {
+    fs.rmSync(projectDataDir, { recursive: true, force: true });
+    console.log(`✓ 已清理索引数据: ${projectDataDir}`);
+  } else {
+    console.log(`  无索引数据需要清理`);
+  }
+
+  console.log(`\n索引数据已清除。项目: ${projectName}`);
 }

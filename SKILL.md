@@ -1,7 +1,7 @@
 ---
 name: codesense
 description: "本地语义代码搜索 - 通过向量索引定位代码片段，支持 AST 依赖追踪。触发：/codesense"
-version: 260429.165025
+version: 260429.173849
 trigger: /codesense
 triggers:
   - codesense

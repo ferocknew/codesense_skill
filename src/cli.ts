@@ -21,6 +21,7 @@ import { register as registerTrace } from "../scripts/trace";
 import { register as registerUpdate } from "../scripts/update";
 import { register as registerStatus } from "../scripts/status";
 import { register as registerUninstall } from "../scripts/uninstall";
+import { register as registerClear } from "../scripts/clear";
 import { register as registerServer } from "../scripts/server";
 
 registerInit(program);
@@ -31,6 +32,7 @@ registerTrace(program);
 registerUpdate(program);
 registerStatus(program);
 registerUninstall(program);
+registerClear(program);
 registerServer(program);
 
 // embed-test 隐藏命令（调试用）
