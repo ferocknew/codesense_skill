@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// codesense - 本地语义代码搜索 v260429.174438
+// codesense - 本地语义代码搜索 v260429.180904
 
 "use strict";
 var __create = Object.create;
@@ -5495,6 +5495,7 @@ async function buildIndex(dir, options = {}) {
   const onProgress = options.onProgress;
   const absDir = path7.resolve(dir);
   const projectName = resolveProjectName(absDir);
+  registerProject(projectName, absDir);
   const files = scanDirectory(absDir);
   if (files.length === 0) {
     console.error("\u672A\u627E\u5230\u652F\u6301\u7684\u4EE3\u7801\u6587\u4EF6\u3002");
@@ -5576,7 +5577,6 @@ async function buildIndex(dir, options = {}) {
     excludeFiles: [...DEFAULT_EXCLUDE_FILES]
   };
   saveConfig(projectName, config);
-  registerProject(projectName, absDir);
   if (!quiet) {
     console.log(`
 \u7D22\u5F15\u6784\u5EFA\u5B8C\u6210\uFF01`);
@@ -5968,9 +5968,13 @@ async function updateByFiles(projectName, indexDir, changedFiles, options = {}) 
   const dbPath = path10.join(outDir, "index.lance");
   const embedder = createEmbedderFromGlobalConfig(config.dimensions);
   await embedder.ensureModel();
+  const projectConfig = loadProjectConfig(indexDir);
+  const excludeFiles = projectConfig?.excludeFiles ?? [];
   const toDelete = [];
   const processable = [];
   for (const file of changedFiles) {
+    const relPath = path10.relative(indexDir, path10.resolve(indexDir, file));
+    if (matchExcludePattern(relPath, excludeFiles)) continue;
     const absPath = path10.resolve(indexDir, file);
     const ext = path10.extname(file);
     if (!fs9.existsSync(absPath)) {
@@ -6153,6 +6157,7 @@ var init_update = __esm({
     init_global();
     init_database();
     init_logger();
+    init_install();
     init_global();
   }
 });
@@ -7607,7 +7612,7 @@ function register10(program3) {
 }
 
 // src/cli.ts
-var VERSION = true ? "260429.174438" : "0.1.0-dev";
+var VERSION = true ? "260429.180904" : "0.1.0-dev";
 var program2 = new Command();
 program2.name("codesense").description("\u672C\u5730\u8BED\u4E49\u4EE3\u7801\u641C\u7D22 - \u901A\u8FC7\u5411\u91CF\u7D22\u5F15\u5B9A\u4F4D\u4EE3\u7801\u7247\u6BB5\uFF0C\u652F\u6301 AST \u4F9D\u8D56\u8FFD\u8E2A").version(VERSION);
 register(program2);

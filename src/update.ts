@@ -5,7 +5,7 @@ import { execSync } from "child_process";
 import { CodeChunk, EXT_TO_LANGUAGE } from "./types";
 import { createEmbedderFromGlobalConfig } from "./embedder";
 import { chunkFile, buildEmbeddingInput } from "./chunker";
-import { scanDirectory } from "./file-scanner";
+import { scanDirectory, matchExcludePattern } from "./file-scanner";
 import { addToTable, deleteFromTable } from "./index";
 import { buildManifest, saveManifest, diffManifests } from "./manifest";
 import { loadConfig, saveConfig } from "./config";
@@ -13,6 +13,7 @@ import { extractDeps, removeFileFromGraph } from "./graph";
 import { findProjectByDir, resolveProjectName, ensureProjectDir } from "./global";
 import { dbSaveManifestIncremental } from "./database";
 import { appendLog } from "./logger";
+import { loadProjectConfig } from "./install";
 import { getProjectDir } from "./global";
 
 function resolveProject(dir: string): { projectName: string; indexDir: string } | null {
@@ -96,10 +97,16 @@ async function updateByFiles(
   const embedder = createEmbedderFromGlobalConfig(config.dimensions);
   await embedder.ensureModel();
 
+  const projectConfig = loadProjectConfig(indexDir);
+  const excludeFiles = projectConfig?.excludeFiles ?? [];
+
   const toDelete: string[] = [];
   const processable: { absPath: string; relPath: string; language: string }[] = [];
 
   for (const file of changedFiles) {
+    const relPath = path.relative(indexDir, path.resolve(indexDir, file));
+    if (matchExcludePattern(relPath, excludeFiles)) continue;
+
     const absPath = path.resolve(indexDir, file);
     const ext = path.extname(file);
 

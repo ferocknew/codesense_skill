@@ -124,7 +124,7 @@ scripts/
 ### 2026-04-29 Embedding 设置 + 后台索引 + Bug 修复
 
 **Embedding 参数可配置**（降低低配机器 CPU 压力）：
-- `EmbeddingConfig` 新增 `batchSize`（默认 32）/ `batchDelay`（默认 0ms）字段
+- `EmbeddingConfig` 新增 `batchSize`（默认 16）/ `batchDelay`（默认 200ms）字段
 - `GlobalConfig`（DB `global_config` 表）同步扩展，存取新 key
 - `embedder.ts` 新增 `createEmbedderFromGlobalConfig(dimensions)` 工厂函数，从 DB 读全局配置构建 embedder
 - `indexer.ts`/`update.ts`/`search.ts` 全部改用工厂函数，embedder 不再硬编码参数
@@ -154,6 +154,20 @@ scripts/
 - **全局化**：`~/.codesense/` 全局目录 + SQLite 元数据，`list`/`search --project`，manifest 增量更新
 - **AST 依赖**：tree-sitter 替换正则，跨文件 import 映射，搜索去重
 - 修改 `src/html/` 下文件需 `node build.js` + 重启服务器
+
+### 2026-04-30 排除规则修复 + 默认参数调整
+
+**默认 Embedding 参数调整**（降低 Ollama 超时风险）：
+- `types.ts` DEFAULT_EMBEDDING_CONFIG：batchSize 32→16，batchDelay 0→200ms
+- `install.ts` initializeDatabase() 硬编码值同步更新
+
+**Bug 修复：update 流程不尊重 excludeFiles**：
+- `update.ts` 的 `updateByFiles()` 新增 `matchExcludePattern` 过滤，处理变更文件前先排除 `.codesense/index.json` 中配置的排除文件
+- 根因：初始索引通过 `scanDirectory` 正确排除了 skill.js 等文件，但 update 通过 git diff 获取文件后直接处理，绕过了排除逻辑，导致 skill.js（297 chunks）重新进入索引
+
+**Bug 修复：clear 后重建索引外键约束失败**：
+- `indexer.ts` 将 `registerProject()` 移到 `buildIndex` 开头，确保 `saveDepGraph` 写入前项目已在 `projects` 表中
+- 根因：`clear` 删除 `projects` 表记录后，`saveDepGraph` 写入 dep_edges 时外键引用失败
 
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence

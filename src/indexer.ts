@@ -28,6 +28,9 @@ export async function buildIndex(
   const absDir = path.resolve(dir);
   const projectName = resolveProjectName(absDir);
 
+  // 0. 确保项目已注册（clear 后可能丢失）
+  registerProject(projectName, absDir);
+
   // 1. 扫描文件
   const files = scanDirectory(absDir);
   if (files.length === 0) {
@@ -128,9 +131,6 @@ export async function buildIndex(
     excludeFiles: [...DEFAULT_EXCLUDE_FILES],
   };
   saveConfig(projectName, config);
-
-  // 11. 注册项目
-  registerProject(projectName, absDir);
 
   if (!quiet) {
     console.log(`\n索引构建完成！`);
